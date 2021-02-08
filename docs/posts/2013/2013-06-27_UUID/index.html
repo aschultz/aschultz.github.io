@@ -1,0 +1,201 @@
+<!DOCTYPE html><html><head><meta charSet="utf-8"/><meta http-equiv="x-ua-compatible" content="ie=edge"/><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"/><meta name="generator" content="Gatsby 2.32.3"/><link as="script" rel="preload" href="/webpack-runtime-15fd1b69514de8afe2ce.js"/><link as="script" rel="preload" href="/framework-078d6d248b03e80a6d05.js"/><link as="script" rel="preload" href="/app-426a2745e2d02e494887.js"/><link as="script" rel="preload" href="/component---src-components-post-tsx-11d3239ab69748bbfcd8.js"/><link as="fetch" rel="preload" href="/page-data\posts\2013\2013-06-27_UUID\page-data.json" crossorigin="anonymous"/><link as="fetch" rel="preload" href="/page-data\app-data.json" crossorigin="anonymous"/></head><body><div id="___gatsby"><div style="outline:none" tabindex="-1" id="gatsby-focus-wrapper"><div><header><nav><ul><li><a href="/">Home</a></li><li><a href="/about">About</a></li></ul></nav></header><main><article><h1>Universal Unique Identifiers</h1><p>Of late I’ve been writing a fair amount of parsing code for some MPEG-4 ISO base media file format content (ISOBMFF from here on). These files are rather straightforward to parse: you can define a basic catch-all structure and add functionality for parsing specific chunks as you go. One issue I ran into recently, however, was a need to parse out some <code>byte[16]</code> blobs containing unique identifiers and display them as the hexadecimal UUIDs we’re familiar with (e.g. <code>6f8db96c-2908-4250-ba92-9a2d67ce6007</code>). Having written my parser in C#, my first thought was to do the following:</p><pre><code class="language-csharp">byte[] data = parser.ReadByteArray(16); //Read in UUID data
+Guid guid = new Guid(data);
+string formattedUuid = guid.ToString();
+</code></pre><p>Unfortunately, this has a nasty problem.</p><pre><code class="language-csharp">// Lets say my original UUID was:
+string uuidString = &quot;DEADBEEF-CAFE-BABE-DEED-0123456789AB&quot;;
+
+// In binary form, per the UUID spec, this should be represented as the following:
+byte[] uuidBytes = new byte[]{ 0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE,
+                               0xDE, 0xED, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB };
+
+// Lets try some things...
+Guid guidFromString = new Guid(uuidString);
+Guid guidFromData = new Guid(uuidBytes);
+
+guidFromString.ToString();     // DEADBEEF-CAFE-BABE-DEED-0123456789AB
+guidFromString.ToByteArray();  // EF-BE-AD-DE-FE-CA-BE-BA-DE-ED-01-23-45-67-89-AB
+
+guidFromData.ToString();     // EFBEADDE-FECA-BEBA-DEED-0123456789AB
+guidFromData.ToByteArray();  // DE-AD-BE-EF-CA-FE-BA-BE-DE-ED-01-23-45-67-89-AB
+</code></pre><p>Say what? Why do the string and byte representations not match? And why are only the first three sections getting shuffled around?</p><h2>Guids are tricky buggers</h2><p>Observe the Windows <a href="https://docs.microsoft.com/en-us/windows/win32/api/guiddef/ns-guiddef-guid">GUID</a> structure. It stores its fields as follows (.NET does the same):</p><pre><code class="language-cpp">typedef struct _GUID {
+  DWORD Data1;
+  WORD  Data2;
+  WORD  Data3;
+  BYTE  Data4[8];
+} GUID;
+</code></pre><p>See the issue? A clue: your processor might have something to do with it.</p><p>When a .NET Guid object is created from a string, the Guid constructor knows that the values in the string are a <a href="https://en.wikipedia.org/wiki/Endianness">big-endian</a> representation of the fields. The hex is parsed and stored into these fields so that the value remains the same — for example, 0xDEADBEEF is 3735928559, so the value 3735928559 is stored in Data1. 0xCAFE is 51966, so Data2 = 51966, and so on.</p><p>When <code>ToString()</code> is called, the method will build a string that is back in the big-endian order. The string you put in is the string you get out.</p><p><strong>However</strong>, when a Guid created this way is serialized via the <code>ToByteArray()</code> method, it is essentially performing a <a href="https://www.cplusplus.com/reference/cstring/memcpy/">memcpy</a> of the structure. This means the binary representation is affected by the endianness of the system.</p><p>The x86 and x86-64 architectures are little-endian. That DWORD value 3735928559 we previously stored is ordered in memory as 0xEFBEADDE. Each byte in Data4, meanwhile, is the same coming out as it was going in because endianness only affects the arrangement of bytes within a multi-byte field, not the order of bits within a single byte. ‘DEED-123456789AB’ (8 bytes total) is stored in the Data4 array, a sequence of individual bytes, hence why it remains the same throughout our tests while the the first three sections get shuffled around.</p><p>Take note that when a Guid is created from a byte[], the assumption is that the input array is in the same order as what ToByteArray spits out. Again, all it does is <code>memcpy</code> the data. If you pass it bytes in big-endian order, then call <code>ToString()</code>, you’ll get a string in little-endian order.</p><h2>The takeaway</h2><p>Given a string representation of a UUID, the .NET Guid object will input/output a matching string (big-endian order), but input/output of binary data is in little-endian order. Since this is annoying to remember, I’ve written up a simple Uuid structure below to help out by homogenizing the inputs and outputs.</p><h2>Code Sample</h2><pre><code class="language-csharp">/// &lt;summary&gt;
+/// UUID implementation based on Guid. Behaves like a Guid except that inputs and outputs
+/// (such as byte[] and strings) are consistent and match a fully big-endian representation
+/// of the UUID structure.
+/// &lt;/summary&gt;
+[Serializable]
+public struct Uuid : IFormattable, IComparable, IComparable&lt;Uuid&gt;, IEquatable&lt;Uuid&gt;
+{
+    //Internally, we use a Guid so that we can take advantage of most of its functionality.
+    private Guid guid;
+
+    public static readonly Uuid Empty = new Uuid();
+
+    /// &lt;summary&gt;
+    /// Creates a UUID from an array of bytes.
+    /// Calls to ToString and ToByteArray will retrieve values in the same order as this initial input.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;uuid&quot;&gt;&lt;/param&gt;
+    public Uuid(byte[] uuidData)
+    {
+        if (BitConverter.IsLittleEndian)
+        {
+            //Little-endian system, so we need to deal with the mismatch between the input layout
+            //and Guid&#x27;s in-memory layout. We can solve this by reading the bytes into fields ourselves.
+
+            Int32 data1 = ((((((uuidData[0] &lt;&lt; 8) | uuidData[1]) &lt;&lt; 8) | uuidData[2]) &lt;&lt; 8) | uuidData[3]);
+            Int16 data2 = (Int16)((uuidData[4] &lt;&lt; 8) | uuidData[5]);
+            Int16 data3 = (Int16)((uuidData[6] &lt;&lt; 8) | uuidData[7]);
+
+            guid = new Guid(data1, data2, data3, uuidData[8], uuidData[9], uuidData[10], uuidData[11],
+                                                 uuidData[12], uuidData[13], uuidData[14], uuidData[15]);
+        }
+        else
+        {
+            //Big-endian system, so Guid&#x27;s in-memory layout already matches incoming Uuid byte ordering.
+            //We can allow Guid to use its shortcut memcpy construction routine.
+            guid = new Guid(uuidData);
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// Creates a UUID from a hexadecimal string representation of the format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX.
+    /// Calls to ToString and ToByteArray will retrieve values in the same order as this initial input.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;uuid&quot;&gt;&lt;/param&gt;
+    public Uuid(string uuid)
+    {
+        guid = new Guid(uuid);
+    }
+
+    /// &lt;summary&gt;
+    /// Creates a UUID from a Windows Guid object.
+    /// Calls to ToString will retrieve values matching Guid.ToString.
+    /// Calls to ToByteArray will retrieve an array with values in the same order as the string representation.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;guid&quot;&gt;&lt;/param&gt;
+    public Uuid(Guid guid)
+    {
+        this.guid = guid;
+    }
+
+    /// &lt;summary&gt;
+    /// Retrieves a byte array representation of the UUID. Byte order matches the ToString representation.
+    /// &lt;/summary&gt;
+    /// &lt;returns&gt;&lt;/returns&gt;
+    public byte[] ToByteArray()
+    {
+        //ToByteArray returns a memcpy of the Guid structure
+        byte[] guidData = guid.ToByteArray();
+
+        if (BitConverter.IsLittleEndian)
+        {
+            //Convert little-endian in-memory representation back into big-endian order
+            Array.Reverse(guidData, 0, 4);
+            Array.Reverse(guidData, 4, 2);
+            Array.Reverse(guidData, 6, 2);
+        }
+
+        return guidData;
+    }
+
+    public static Uuid NewUuid()
+    {
+        return new Uuid() { guid = Guid.NewGuid() };
+    }
+
+    public static bool operator !=(Uuid a, Uuid b)
+    {
+        return a.guid != b.guid;
+    }
+
+    public static bool operator ==(Uuid a, Uuid b)
+    {
+        return a.guid == b.guid;
+    }
+
+    public bool Equals(Uuid u)
+    {
+        return guid.Equals(u.guid);
+    }
+
+    public override bool Equals(object o)
+    {
+        if(o is Uuid)
+            return this.Equals((Uuid)o);
+        return false;
+    }
+
+    public override int GetHashCode()
+    {
+        return guid.GetHashCode();
+    }
+
+    public int CompareTo(Uuid value)
+    {
+        return guid.CompareTo(value.guid);
+    }
+
+    public int CompareTo(Object value)
+    {
+        if (value is Uuid)
+            return guid.CompareTo(((Uuid)value).guid);
+        else
+            throw new ArgumentException(&quot;Value must be of type Uuid&quot;);
+    }
+
+    /// &lt;summary&gt;
+    /// Retrieves a hexadecimal string representation with each byte corresponding
+    /// to a hex tuple in left-to-right order, in the format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+    /// &lt;/summary&gt;
+    public override string ToString()
+    {
+        return guid.ToString();
+    }
+
+    public string ToString(string format)
+    {
+        return guid.ToString(format);
+    }
+
+    public string ToString(string format, IFormatProvider provider)
+    {
+        return guid.ToString(format, provider);
+    }
+
+    public static bool TryParse(string input, out Uuid result)
+    {
+        Guid guidResult;
+        if (Guid.TryParse(input, out guidResult))
+        {
+            result = new Uuid() { guid = guidResult };
+            return true;
+        }
+        else
+        {
+            result = Uuid.Empty;
+            return false;
+        }
+    }
+
+    public static bool TryParseExact(string input, string format, out Uuid result)
+    {
+        Guid guidResult;
+        if (Guid.TryParseExact(input, format, out guidResult))
+        {
+            result = new Uuid() { guid = guidResult };
+            return true;
+        }
+        else
+        {
+            result = Uuid.Empty;
+            return false;
+        }
+    }
+}
+</code></pre></article></main><aside></aside></div></div><div id="gatsby-announcer" style="position:absolute;top:0;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0, 0, 0, 0);white-space:nowrap;border:0" aria-live="assertive" aria-atomic="true"></div></div><script id="gatsby-script-loader">/*<![CDATA[*/window.pagePath="/posts/2013/2013-06-27_UUID";/*]]>*/</script><script id="gatsby-chunk-mapping">/*<![CDATA[*/window.___chunkMapping={"polyfill":["/polyfill-38cce18603b1d20cac17.js"],"app":["/app-426a2745e2d02e494887.js"],"component---src-components-post-tsx":["/component---src-components-post-tsx-11d3239ab69748bbfcd8.js"],"component---src-pages-about-tsx":["/component---src-pages-about-tsx-cd127cf8e50ea341ff3c.js"],"component---src-pages-index-tsx":["/component---src-pages-index-tsx-445b62e5980dfab12b36.js"]};/*]]>*/</script><script src="/polyfill-38cce18603b1d20cac17.js" nomodule=""></script><script src="/component---src-components-post-tsx-11d3239ab69748bbfcd8.js" async=""></script><script src="/app-426a2745e2d02e494887.js" async=""></script><script src="/framework-078d6d248b03e80a6d05.js" async=""></script><script src="/webpack-runtime-15fd1b69514de8afe2ce.js" async=""></script></body></html>

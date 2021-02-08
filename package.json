@@ -1,0 +1,41 @@
+{
+    "name": "aschultz.github.io",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "build": "gatsby clean && gatsby build",
+        "dev": "gatsby develop",
+        "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
+        "start": "npm run develop",
+        "serve": "gatsby serve",
+        "clean": "gatsby clean",
+        "test": "echo \"Write tests! -> https://gatsby.dev/unit-testing\" && exit 1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/aschultz/aschultz.github.io.git"
+    },
+    "author": "",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/aschultz/aschultz.github.io/issues"
+    },
+    "homepage": "https://aschultz.github.io/",
+    "dependencies": {
+        "@mdx-js/mdx": "^1.6.22",
+        "@mdx-js/react": "^1.6.22",
+        "gatsby": "^2.32.3",
+        "gatsby-image": "^2.11.0",
+        "gatsby-plugin-mdx": "^1.10.0",
+        "gatsby-plugin-sharp": "^2.14.1",
+        "gatsby-plugin-typescript": "^2.12.0",
+        "gatsby-remark-images": "^3.11.0",
+        "gatsby-source-filesystem": "^2.11.0",
+        "react": "^17.0.1",
+        "react-dom": "^17.0.1"
+    },
+    "devDependencies": {
+        "prettier": "^2.2.1"
+    }
+}

@@ -1,0 +1,66 @@
+<!DOCTYPE html><html><head><meta charSet="utf-8"/><meta http-equiv="x-ua-compatible" content="ie=edge"/><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"/><meta name="generator" content="Gatsby 2.32.3"/><link as="script" rel="preload" href="/webpack-runtime-15fd1b69514de8afe2ce.js"/><link as="script" rel="preload" href="/framework-078d6d248b03e80a6d05.js"/><link as="script" rel="preload" href="/app-426a2745e2d02e494887.js"/><link as="script" rel="preload" href="/component---src-components-post-tsx-11d3239ab69748bbfcd8.js"/><link as="fetch" rel="preload" href="/page-data\posts\2015\2015-08-14_Excel\page-data.json" crossorigin="anonymous"/><link as="fetch" rel="preload" href="/page-data\app-data.json" crossorigin="anonymous"/></head><body><div id="___gatsby"><div style="outline:none" tabindex="-1" id="gatsby-focus-wrapper"><div><header><nav><ul><li><a href="/">Home</a></li><li><a href="/about">About</a></li></ul></nav></header><main><article><h1>Excel-ing at the speed of C</h1><p>Excel is a great tool, but some of its most powerful features are ancient, obscurely documented, or poorly designed. Case in point: Excel includes a Visual Basic scripting system allowing for creation of custom macros and programmatic control over documents. It can be quite useful, but is ultimately limited by the VBA language and type system — stuck in a time before .NET, lacking even basic unsigned integer support. So what if we could break out of VBA and call into our own DLL?</p><p>Thankfully, Excel can interop with basically any native DLL as long as it follows the right esoteric conventions. For example, let’s create a simple method in C that takes an input and returns it.</p><pre><code class="language-cpp">extern &quot;C&quot; int GetValue( int value )
+{
+    return value;
+}
+</code></pre><p>And in VBA…</p><pre><code class="language-vb">&#x27;&#x27; Declare the signature of the external function &quot;GetValue&quot; and where to find it
+Private Declare Function GetValue Lib &quot;C:\bin\MyLib.dll&quot; (ByVal value As Long) As Long
+
+&#x27;&#x27;&#x27; Declare a method we can run in Excel editor for debugging/testing
+Public Sub TestMyLib()
+    Dim retVal As Long
+
+    retVal = GetValue(5) &#x27;&#x27;&#x27; Will set retVal to 5
+End Function
+</code></pre><p>There are several things to note here:</p><ul><li>The C/C++ library must define methods as extern “C” so that they are exported without any C++ style name mangling. This is necessary so that VBA can find the method by name.</li><li>The data types in C and VB must match in size. An “int” in C being 32-bit corresponds to the “Long” 32-bit type in VB, not the “Integer” type which is only 16 bits. Mismatches will cause either an Overflow error or a crash.</li><li>The VB method declaration requires specifying the path to the DLL. Normally this needs to be absolute; we’ll later discuss a workaround.</li></ul><p>Let’s take another step and say we want to read in a string storing an error code, convert it to a number, and send back a description of it.</p><pre><code class="language-cpp">extern &quot;C&quot; VARIANT GetErrorDescription( BSTR bstrErrorCode )
+{
+    unsigned long   dwErrorCode      = 0;
+    const char    * pszErrName       = NULL;
+    BSTR            bstrErrorMessage = NULL;
+    int             cchErrorMessage  = 0;
+    int             cchErrName       = 0;
+    VARIANT         vnt;
+
+    // Parse integer from input string
+    dwErrorCode = wcstoul(bstrErrorCode, NULL, 0);
+
+    // Call helper method that looks up the string for this error code
+    pszErrName = GetErrorNameFromCode( dwErrorCode, NULL );
+    cchErrName = (int)strlen(pszErrName);
+
+    // Convert message to UTF-16 so that we can store it in BSTR
+    cchErrorMessage = MultiByteToWideChar(CP_UTF8, 0, pszErrName, cchErrName, NULL, 0);
+    bstrErrorMessage = SysAllocStringLen(0, (unsigned int)cchErrorMessage);
+    MultiByteToWideChar(CP_UTF8, 0, pszErrName, cchErrName, bstrErrorMessage, cchErrorMessage);
+
+    // Return as a VARIANT.
+    // This is necessary to prevent VBA callers from mangling the string by
+    // attempting to convert to UNICODE (VBA does this if the return value is just BSTR).
+    VariantInit(&amp;amp;amp;amp;amp;amp;vnt);
+    vnt.vt = VT_BSTR;
+    vnt.bstrVal = bstrErrorMessage;
+}
+</code></pre><pre><code class="language-vb">Private Declare Function GetErrorDescription Lib &quot;C:\bin\MyLib.dll&quot; (ByVal value As LongPtr) As Variant
+
+&#x27;&#x27;&#x27; Declare a method we can run in Excel editor for debugging/testing
+Public Sub TestMyLib()
+    Dim retVal As String
+
+    retVal = GetErrorDescription(StrPtr(&quot;5&quot;))
+End Function
+</code></pre><p>Clearly this is bit more complex.</p><ul><li>A string must be passed as a BSTR. Not a char <em>, or wchar </em>, or std::string, or anything else. A BSTR is a special string data type designed for interop, containing a length-prefix, an array of wchar, and two null-terminating characters.</li><li>Despite Excel using BSTR internally and our method taking BSTR, Excel will take any “String” parameter or return value in the VBA Declare statement and run it through a Unicode to ASCII conversion. To avoid the mess this causes, we pass a pointer to the incoming BSTR and return a VARIANT type containing a BSTR. That avoids any automatic conversions.</li></ul><h2>Dynamic Paths</h2><p>At this point we can start using our native code do some heavy lifting, but we’re still stuck with a hard-coded path to the binary in our VBA. That’s rather limiting. We can leverage what we know so far, however, to hack in a solution.</p><pre><code class="language-vb">Private Declare Function LoadLibrary Lib &quot;kernel32&quot; Alias &quot;LoadLibraryA&quot; (ByVal lpLibFileName As String) As LongPtr
+
+Private Declare Function GetErrorDescription Lib &quot;MyLib.dll&quot; (ByVal value As LongPtr) As Variant
+
+Public Sub TestMyLib()
+    Static hasLoadedLib As Boolean
+    Dim retVal As String
+
+    If Not hasLoadedLib Then
+        If LoadLibrary(ThisWorkbook.Path &amp; &quot;\&quot; &amp; &quot;MyLib.dll&quot;) &lt;&gt; 0 Then
+            hasLoadedLib = True
+        End If
+    End If
+
+    retVal = GetErrorDescription(StrPtr(&quot;5&quot;))
+End Function
+</code></pre><p>First, we modify the Declare statement for our lib to mention just the filename. Then, since system libraries are accessible without a full path, we can call the system’s LoadLibrary method to dynamically load our DLL from whatever path we want — in this case, the same folder as the workbook itself. Once the DLL is loaded into memory, Excel will happily use it without a second thought.</p><h2>References</h2><ul><li><a href="http://web.archive.org/web/20161116225951/https://msdn.microsoft.com/en-us/library/office/bb687915.aspx">How to: Access DLLs in Excel</a></li><li><a href="http://web.archive.org/web/20161116225951/http://blog.nkadesign.com/2013/vba-unicode-strings-and-the-windows-api/">VBA: Unicode Strings and the Windows API</a></li><li><a href="http://web.archive.org/web/20161116225951/http://blogs.msdn.com/b/ericlippert/archive/2003/09/12/52976.aspx">Eric’s Complete Guide To BSTR Semantics</a></li></ul></article></main><aside></aside></div></div><div id="gatsby-announcer" style="position:absolute;top:0;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0, 0, 0, 0);white-space:nowrap;border:0" aria-live="assertive" aria-atomic="true"></div></div><script id="gatsby-script-loader">/*<![CDATA[*/window.pagePath="/posts/2015/2015-08-14_Excel";/*]]>*/</script><script id="gatsby-chunk-mapping">/*<![CDATA[*/window.___chunkMapping={"polyfill":["/polyfill-38cce18603b1d20cac17.js"],"app":["/app-426a2745e2d02e494887.js"],"component---src-components-post-tsx":["/component---src-components-post-tsx-11d3239ab69748bbfcd8.js"],"component---src-pages-about-tsx":["/component---src-pages-about-tsx-cd127cf8e50ea341ff3c.js"],"component---src-pages-index-tsx":["/component---src-pages-index-tsx-445b62e5980dfab12b36.js"]};/*]]>*/</script><script src="/polyfill-38cce18603b1d20cac17.js" nomodule=""></script><script src="/component---src-components-post-tsx-11d3239ab69748bbfcd8.js" async=""></script><script src="/app-426a2745e2d02e494887.js" async=""></script><script src="/framework-078d6d248b03e80a6d05.js" async=""></script><script src="/webpack-runtime-15fd1b69514de8afe2ce.js" async=""></script></body></html>
