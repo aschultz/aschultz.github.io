@@ -1,0 +1,235 @@
+/*=============================================================
+                         RESET
+=============================================================*/
+
+*,
+::before,
+::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-weight: inherit;
+}
+
+html {
+    cursor: default;
+    tab-size: 4;
+    font-size: 62.5%; /* Set rem baseline to 10px on browser default text size */
+    line-height: 1;
+}
+
+table {
+    border-collapse: collapse;
+    border-color: inherit;
+    text-indent: 0;
+}
+
+b,
+strong,
+th {
+    font-weight: bolder;
+}
+
+ol,
+ul {
+    list-style: none;
+}
+
+pre {
+    overflow: auto;
+}
+
+textarea {
+    margin: 0;
+    overflow: auto;
+}
+
+audio,
+video,
+canvas,
+iframe,
+img,
+svg {
+    vertical-align: middle;
+}
+progress {
+    display: inline-block;
+    vertical-align: baseline;
+}
+
+[aria-disabled="true"],
+[disabled] {
+    cursor: not-allowed;
+}
+
+/*=============================================================
+                         FONTS
+=============================================================*/
+@font-face {
+    font-family: "Urbanist";
+    src: url("../assets/UrbanistGX.ttf") format("truetype");
+    font-weight: 30 150;
+}
+
+body {
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 1.4rem; /* Default to 14px */
+    line-height: 1;
+}
+
+h1 {
+    font-size: 2em;
+    line-height: 1;
+}
+h2 {
+    font-size: 1.5em;
+}
+h3 {
+    font-size: 1.25em;
+}
+
+p,
+blockquote,
+li {
+    font-size: 1em;
+    line-height: 1.5;
+}
+code {
+    font-size: 1em;
+    line-height: 1.4;
+    font-family: monospace;
+}
+a {
+    text-decoration: none;
+}
+p a {
+    text-decoration: initial;
+}
+
+/*=============================================================
+                         LAYOUT
+=============================================================*/
+
+.siteRoot {
+    display: grid;
+    grid-template-columns: 100%;
+    grid-auto-columns: 0;
+    grid-template-areas:
+        "header"
+        "main"
+        "footer";
+}
+@media (min-width: 500px) {
+    .siteRoot {
+        grid-template-columns: auto min(100%, 800px) auto;
+        grid-template-rows: auto 100% auto;
+        grid-auto-columns: 0;
+        grid-auto-rows: 0;
+        grid-template-areas:
+            ". header ."
+            ". main ."
+            ". footer .";
+    }
+}
+
+.siteRoot > header {
+    grid-area: header;
+}
+
+.siteRoot > main {
+    grid-area: main;
+}
+
+.siteRoot > aside {
+    grid-area: sidebar;
+}
+
+.siteRoot > footer {
+    grid-area: footer;
+}
+
+.siteNav {
+    font-family: "Urbanist", "Century Gothic", sans-serif;
+    line-height: 1;
+    box-shadow: 0px 0px 4px 0px #bebebe;
+
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: stretch;
+    flex-wrap: wrap;
+}
+
+.siteNav > a {
+    margin: 0 20px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    color: #666666;
+}
+.siteNav > a:hover {
+    color: #aaaaaa;
+}
+.siteNav h1 {
+    font-weight: 60;
+    font-size: 2.5em;
+    line-height: 1.75;
+    letter-spacing: 0.1em;
+}
+.siteNav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: stretch;
+    text-transform: uppercase;
+}
+.siteNav li {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    font-weight: 30;
+    font-size: 1.4em;
+    line-height: 1;
+}
+.siteNav li:not(:last-child)::after {
+    content: "";
+    position: relative;
+    align-self: center;
+    height: 50%;
+    border-right: 1px solid #666666;
+}
+.siteNav li a {
+    text-decoration: none;
+    color: inherit;
+    padding: 0 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.siteNav li a:hover {
+    background-color: #dddddd;
+}
+.siteNav li img,
+.siteNav li svg {
+    width: 1.4em;
+    height: 1.4em;
+}
+
+main {
+    padding: 20px 20px;
+}
+
+article {
+    margin-bottom: 20px;
+}
+
+pre {
+    background-color: #333333;
+    color: #eeeeee;
+    border-radius: 5px;
+    padding: 0.5em 2ch;
+}

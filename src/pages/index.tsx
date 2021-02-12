@@ -7,13 +7,14 @@ export default function Home({ data }: any) {
 
     return (
         <Layout>
-            <h1>TEST</h1>
             {posts.map(({ node: post }) => (
                 <article>
                     <Link to={post.fields.slug}>
-                        <h2>{post.frontmatter.title}</h2>
+                        <h1 itemProp="headline">{post.frontmatter.title}</h1>
                     </Link>
-                    <h4>{post.frontmatter.date}</h4>
+                    <time itemProp="datePublished" dateTime={post.frontmatter.date}>
+                        {post.frontmatter.formattedDate}
+                    </time>
                     <p>{post.frontmatter.excerpt || post.excerpt}</p>
                 </article>
             ))}
@@ -32,7 +33,8 @@ export const pageQuery = graphql`
                         slug
                     }
                     frontmatter {
-                        date(formatString: "YYYY-MM-DD")
+                        date
+                        formattedDate: date(formatString: "MMMM DD, YYYY")
                         title
                         subtitle
                         excerpt

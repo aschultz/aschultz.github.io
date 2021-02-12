@@ -24,6 +24,14 @@ module.exports = {
             },
         },
         {
+            resolve: "gatsby-plugin-react-svg",
+            options: {
+                rule: {
+                    include: /\.inline\.svg$/,
+                },
+            },
+        },
+        {
             resolve: `gatsby-plugin-typescript`,
             options: {
                 isTSX: true, // defaults to false

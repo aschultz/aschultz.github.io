@@ -3,8 +3,6 @@ title: "Setting Up: OpenGL + GLUT + Windows + Visual Studio"
 date: 2012-11-16
 ---
 
-# Setting Up: OpenGL + GLUT + Windows + Visual Studio
-
 I was recently helping a friend get set up running OpenGL and I realized that most of the instructions available online for this are fairly outdated. So, here’s a quick run through to set the record straight. This guide is meant for beginners who just want to get a simple OpenGL desktop app going on a Windows machine.
 
 This guide assume you have the following installed:

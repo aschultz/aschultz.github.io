@@ -11,10 +11,18 @@ const mdxComponents = {};
 export default function Post({ data }: any) {
     return (
         <Layout>
-            <article>
-                <MDXProvider components={mdxComponents}>
-                    <MDXRenderer>{data.mdx.body}</MDXRenderer>
-                </MDXProvider>
+            <article itemScope itemType="http://schema.org/Article">
+                <header>
+                    <h1 itemProp="headline">{data.mdx.frontmatter.title}</h1>
+                    <time itemProp="datePublished" dateTime={data.mdx.frontmatter.date}>
+                        {data.mdx.frontmatter.formattedDate}
+                    </time>
+                </header>
+                <div itemProp="articleBody">
+                    <MDXProvider components={mdxComponents}>
+                        <MDXRenderer>{data.mdx.body}</MDXRenderer>
+                    </MDXProvider>
+                </div>
             </article>
         </Layout>
     );
@@ -25,7 +33,8 @@ export const pageQuery = graphql`
         mdx(id: { eq: $id }) {
             body
             frontmatter {
-                date(formatString: "MMMM DD, YYYY")
+                date
+                formattedDate: date(formatString: "MMMM DD, YYYY")
                 title
                 subtitle
             }
