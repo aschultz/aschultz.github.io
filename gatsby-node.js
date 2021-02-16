@@ -3,12 +3,29 @@ const path = require("path");
 const fs = require("fs");
 const { createFilePath } = require("gatsby-source-filesystem");
 
-exports.onCreateWebpackConfig = ({ stage, actions }) => {
+exports.onCreateWebpackConfig = ({ stage, getConfig, actions }) => {
     if (stage === `build-javascript`) {
-        // Disable source maps
-        actions.setWebpackConfig({
+        const newWebpackConfig = {
+            ...getConfig(),
+            // Disable source maps
             devtool: false,
-        });
+            // Disable hash in filename. This should reduce churn in git.
+            // GitHub pages has a fixed Cache-Control header of "max-age=600", so
+            // it can't really make use of long-term immutable hashes anyway.
+            output: {
+                filename: `[name].js`,
+                chunkFilename: `[name].js`,
+                path: getConfig().output.path,
+                publicPath: getConfig().output.publicPath,
+            },
+            // optimization: {
+            //     ...getConfig().optimization,
+            //     minimize: false,
+            // },
+        };
+        console.log(newWebpackConfig);
+
+        actions.replaceWebpackConfig(newWebpackConfig);
     }
 };
 
@@ -21,9 +38,10 @@ exports.createSchemaCustomization = ({ actions }) => {
         type ArticleFrontmatter @noinfer {
             title: String!
             subtitle: String
-            excerpt: String
             date: Date @dateformat
             tags: [String]
+            summary: String!
+            excerpt: String
         }
 
         type MdxFields @noinfer {
@@ -97,16 +115,11 @@ exports.createPages = async ({ actions, graphql, reporter }) => {
     });
 };
 
-// Gatsby doesn't support configuring the output folder. Rename the output to align with GitHub pages expectations.
+// Gatsby doesn't support configuring the output folder. We set up a script in
+// package.json to rename the output to align with GitHub pages expectations.
+// The following makes sure that output directory gets cleaned when public does.
 exports.onPreInit = () => {
-    if (process.argv[2] === "build") {
+    if (process.argv[2] === "clean" || process.argv[2] === "build") {
         fs.rmdirSync(path.join(__dirname, "docs"), { recursive: true });
-    }
-};
-
-exports.onPostBuild = () => {
-    if (process.argv[2] === "build") {
-        fs.rmdirSync(path.join(__dirname, "docs"), { recursive: true });
-        fs.renameSync(path.join(__dirname, "public"), path.join(__dirname, "docs"));
     }
 };

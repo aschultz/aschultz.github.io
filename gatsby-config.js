@@ -2,12 +2,34 @@
 
 module.exports = {
     siteMetadata: {
-        title: ``,
         siteUrl: `https://aschultz.github.io/`,
-        description: ``,
+        title: `a.schultz`,
+        description: `Pratical solutions to every day problems`,
     },
     plugins: [
-        `gatsby-plugin-sharp`,
+        {
+            resolve: `gatsby-plugin-sitemap`,
+            options: {},
+        },
+        {
+            resolve: `gatsby-plugin-robots-txt`,
+            options: {},
+        },
+        {
+            resolve: "gatsby-plugin-html-attributes",
+            options: {
+                lang: "en",
+            },
+        },
+        `gatsby-plugin-react-helmet`,
+        {
+            resolve: `gatsby-plugin-sharp`,
+            options: {
+                defaultQuality: 90,
+                useMozJpeg: false,
+                stripMetadata: true,
+            },
+        },
         `gatsby-remark-images`,
         {
             resolve: `gatsby-plugin-mdx`,
@@ -17,10 +39,21 @@ module.exports = {
                     {
                         resolve: `gatsby-remark-images`,
                         options: {
-                            maxWidth: 1200,
+                            maxWidth: 800,
+                            quality: 90,
+                            srcSetBreakpoints: [200, 400, 800],
+                        },
+                    },
+                    {
+                        resolve: `gatsby-remark-prismjs`,
+                        options: {
+                            classPrefix: "language-",
+                            noInlineHighlight: true,
                         },
                     },
                 ],
+                remarkPlugins: [require(`remark-math`)],
+                rehypePlugins: [require(`rehype-katex`)],
             },
         },
         {

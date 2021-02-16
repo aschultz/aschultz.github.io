@@ -1,5 +1,6 @@
 import React from "react";
 import { Link, graphql } from "gatsby";
+import { Helmet } from "react-helmet";
 import { MDXProvider } from "@mdx-js/react";
 import { MDXRenderer } from "gatsby-plugin-mdx";
 import { Layout } from "./layout";
@@ -9,22 +10,29 @@ import { Layout } from "./layout";
 const mdxComponents = {};
 
 export default function Post({ data }: any) {
+    const { frontmatter, body } = data.mdx;
     return (
-        <Layout>
-            <article itemScope itemType="http://schema.org/Article">
-                <header>
-                    <h1 itemProp="headline">{data.mdx.frontmatter.title}</h1>
-                    <time itemProp="datePublished" dateTime={data.mdx.frontmatter.date}>
-                        {data.mdx.frontmatter.formattedDate}
-                    </time>
-                </header>
-                <div itemProp="articleBody">
-                    <MDXProvider components={mdxComponents}>
-                        <MDXRenderer>{data.mdx.body}</MDXRenderer>
-                    </MDXProvider>
-                </div>
-            </article>
-        </Layout>
+        <>
+            <Helmet defer={false}>
+                <title>{frontmatter.title}</title>
+                <meta name="description" content={frontmatter.summary} />
+            </Helmet>
+            <Layout>
+                <article className="cbox" itemScope itemType="http://schema.org/Article">
+                    <header className="ccontent">
+                        <h1 itemProp="name headline">{frontmatter.title}</h1>
+                        <time itemProp="datePublished" dateTime={frontmatter.date}>
+                            {frontmatter.formattedDate}
+                        </time>
+                    </header>
+                    <div className="ccontent" itemProp="articleBody">
+                        <MDXProvider components={mdxComponents}>
+                            <MDXRenderer>{body}</MDXRenderer>
+                        </MDXProvider>
+                    </div>
+                </article>
+            </Layout>
+        </>
     );
 }
 
@@ -37,6 +45,8 @@ export const pageQuery = graphql`
                 formattedDate: date(formatString: "MMMM DD, YYYY")
                 title
                 subtitle
+                excerpt
+                summary
             }
         }
     }
