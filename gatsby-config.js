@@ -9,7 +9,16 @@ module.exports = {
     plugins: [
         {
             resolve: `gatsby-plugin-sitemap`,
-            options: {},
+            options: {
+                // Sort sitemap entries to ensure consistency across builds.
+                // This is convoluted because there aren't good hooks for customizing serialize.
+                serialize: (args) => {
+                    const defaults = require(`gatsby-plugin-sitemap/internals`).defaultOptions;
+                    const data = defaults.serialize(args);
+                    data.sort((x) => x.url);
+                    return data;
+                },
+            },
         },
         {
             resolve: `gatsby-plugin-robots-txt`,

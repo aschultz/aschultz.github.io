@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Sitemap: https://aschultz.github.io/sitemap.xml
+Host: https://aschultz.github.io
