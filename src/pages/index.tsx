@@ -12,6 +12,7 @@ export default function Home({ data }: any) {
             <Helmet defer={false}>
                 <title>{siteMetadata.title}</title>
                 <meta name="description" content={siteMetadata.description} />
+                <meta name="msvalidate.01" content="E4CFADA6D27D25819472B16E008624A8" />
             </Helmet>
             <Layout>
                 {posts.map(({ node: post }) => (

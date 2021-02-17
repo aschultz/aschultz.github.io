@@ -17,6 +17,7 @@ By convention, we assume the OS is installed to the C drive and VS is installed 
 
 The first step is to download GLUT (the [OpenGl Utility Toolkit](https://en.wikipedia.org/wiki/OpenGL_Utility_Toolkit)). This library provides a slew of helper functions for working with OpenGL, including setting up a window. Grab the latest binaries from [here](https://user.xmission.com/~nate/glut.html). Unzip this and copy the binaries out into the following directories. Be aware that these are 32-bit binaries. You will need to create the `gl` folder in `Microsoft Visual Studio 10.0\VC\include\`, as it doesn’t already exist.
 
+<div>
 <table>
 <tbody>
 <tr><th></th><th>File</th><th>Destination Folder</th></tr>
@@ -28,6 +29,7 @@ The first step is to download GLUT (the [OpenGl Utility Toolkit](https://en.wiki
 <tr><td>glut32.lib</td><td>C:\Program Files\Microsoft Visual Studio 10.0\VC\lib\</td></tr>
 </tbody>
 </table>
+</div>
 
 ## Creating the VS project
 

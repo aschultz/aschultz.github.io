@@ -2,8 +2,8 @@ import React from "react";
 import { Link } from "gatsby";
 import "./_reset.css";
 // import "katex/dist/katex.min.css";
-// import "prism-themes/themes/prism-vs.css";
 import "./layout.css";
+import "./code.css";
 import GitHubLogo from "../assets/GitHub-Mark.inline.svg";
 import LinkedInLogo from "../assets/LinkedIn.inline.svg";
 
@@ -12,6 +12,11 @@ import LinkedInLogo from "../assets/LinkedIn.inline.svg";
 export function Layout(props: any) {
     return (
         <div className="siteRoot">
+            <div className="bg">
+                <div className="bg-left"></div>
+                <div className="bg-main"></div>
+                <div className="bg-right"></div>
+            </div>
             <header>
                 <nav className="siteNav">
                     <Link to={"/"}>

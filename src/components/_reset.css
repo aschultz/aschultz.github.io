@@ -36,11 +36,6 @@ ul li::before {
     content: "\200B"; /* Safari fix */
 }
 
-pre {
-    overflow-x: auto;
-    white-space: pre;
-}
-
 textarea {
     margin: 0;
     overflow: auto;

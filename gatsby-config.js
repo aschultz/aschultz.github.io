@@ -4,7 +4,7 @@ module.exports = {
     siteMetadata: {
         siteUrl: `https://aschultz.github.io/`,
         title: `a.schultz`,
-        description: `Pratical solutions to every day problems`,
+        description: `Pratical solutions to everyday problems`,
     },
     plugins: [
         {
@@ -15,7 +15,7 @@ module.exports = {
                 serialize: (args) => {
                     const defaults = require(`gatsby-plugin-sitemap/internals`).defaultOptions;
                     const data = defaults.serialize(args);
-                    data.sort((x) => x.url);
+                    data.sort((left, right) => (left.url < right.url ? -1 : left.url > right.url ? 1 : 0));
                     return data;
                 },
             },
