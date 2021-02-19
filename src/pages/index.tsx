@@ -39,7 +39,7 @@ export const pageQuery = graphql`
                 description
             }
         }
-        allBlogPost {
+        allBlogPost(sort: { fields: date, order: DESC }) {
             edges {
                 node {
                     slug
