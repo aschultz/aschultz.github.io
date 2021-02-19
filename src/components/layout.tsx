@@ -24,7 +24,7 @@ export function Layout(props: any) {
                     </Link>
                     <ul>
                         <li>
-                            <Link to={"/about"}>About</Link>
+                            <Link to={"/about/"}>About</Link>
                         </li>
                         <li>
                             <a href="https://github.com/aschultz" title="GitHub">

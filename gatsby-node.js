@@ -29,42 +29,70 @@ exports.onCreateWebpackConfig = ({ stage, getConfig, actions }) => {
     }
 };
 
-exports.createSchemaCustomization = ({ actions }) => {
+exports.createSchemaCustomization = ({ actions, schema }) => {
     const { createTypes } = actions;
 
     // Explicitly declare schema for our Mdx nodes.
-    // This ensures the build breaks if pages don't supply valid data.
-    createTypes(`
-        type ArticleFrontmatter @noinfer {
-            title: String!
-            subtitle: String
-            date: Date @dateformat
-            tags: [String]
-            summary: String!
-            excerpt: String
-        }
-
-        type MdxFields @noinfer {
+    // This ensures the release build breaks if pages don't supply valid data.
+    createTypes([
+        `
+        type CustomMdxFields @dontInfer {
             collection: String!
             slug: String!
         }
-
-        type Mdx implements Node {
-            frontmatter: ArticleFrontmatter
-            fields: MdxFields
+        type PageFrontmatter @dontInfer {
+            title: String!
+            description: String!
         }
-    `);
+        type ArticleFrontmatter @dontInfer {
+            title: String!
+            summary: String!
+            subtitle: String
+            date: Date @dateformat
+            tags: [String]
+            excerpt: String
+        }`,
+        schema.buildUnionType({
+            name: "CustomMdxFrontmatter",
+            types: ["PageFrontmatter", "ArticleFrontmatter"],
+            resolveType: (node) => {
+                if ("summary" in node) return "ArticleFrontmatter";
+                return "PageFrontmatter";
+            },
+        }),
+        `
+        type Mdx implements Node  @dontInfer {
+            fields: CustomMdxFields!
+            frontmatter: CustomMdxFrontmatter!
+        }
+        
+        type BlogPost implements Node @dontInfer {
+            slug: String!
+            body: String
+            title: String!
+            summary: String!
+            subtitle: String
+            date: Date @dateformat
+            tags: [String]
+            excerpt: String
+        }
+
+        `,
+    ]);
 };
 
-exports.onCreateNode = ({ node, actions, getNode }) => {
-    const { createNodeField } = actions;
+exports.onCreateNode = ({ node, actions, getNode, createNodeId, createContentDigest }) => {
+    const { createNode, createNodeField } = actions;
 
-    // Add fields to MDX pages
     if (node.internal.type === "Mdx") {
         const parent = getNode(node.parent);
         const collection = parent.sourceInstanceName;
         const filePath = createFilePath({ node, getNode, trailingSlash: false });
 
+        // Hoist "pages" to top-level
+        const slugRoot = collection === "pages" ? "" : "/" + collection;
+
+        // Add fields to MDX nodes
         createNodeField({
             node,
             name: "collection",
@@ -73,14 +101,34 @@ exports.onCreateNode = ({ node, actions, getNode }) => {
         createNodeField({
             node,
             name: "slug",
-            value: `/${collection}${filePath}`,
+            value: `${slugRoot}${filePath}/`,
         });
+
+        // Pull posts into their own custom node so they're easier to query for
+        if (collection === "posts") {
+            const postNode = {
+                ...node.frontmatter,
+
+                slug: node.fields.slug,
+                body: node.body,
+
+                id: createNodeId(`${node.id} >>> BlogPost`),
+                parent: node.id,
+                children: [],
+                internal: {
+                    type: "BlogPost",
+                },
+            };
+            postNode.internal.contentDigest = createContentDigest(postNode);
+            createNode(postNode);
+        }
     }
 };
 
 exports.createPages = async ({ actions, graphql, reporter }) => {
     const { createPage } = actions;
 
+    // Query for our MDX files
     const result = await graphql(`
         {
             allMdx {
@@ -89,6 +137,7 @@ exports.createPages = async ({ actions, graphql, reporter }) => {
                         id
                         fields {
                             slug
+                            collection
                         }
                     }
                 }
@@ -100,6 +149,17 @@ exports.createPages = async ({ actions, graphql, reporter }) => {
         reporter.panicOnBuild('🚨  ERROR: Loading "createPages" query');
     }
 
+    function getTemplateForPage(node) {
+        switch (node.fields.collection) {
+            case "pages":
+                return path.resolve(`src/components/page.tsx`);
+            case "posts":
+                return path.resolve(`src/components/post.tsx`);
+        }
+        reporter.panicOnBuild(`🚨  ERROR: Unknown collection type ${node.fields.collection}`);
+        return undefined;
+    }
+
     // Output a page for each MDX file
     result.data.allMdx.edges.forEach(({ node }) => {
         createPage({
@@ -107,7 +167,7 @@ exports.createPages = async ({ actions, graphql, reporter }) => {
             path: node.fields.slug,
 
             // Template used to render MDX content
-            component: path.resolve(`src/components/post.tsx`),
+            component: getTemplateForPage(node),
 
             // Data passed to template as `this.props.pageContext` and to page query
             context: { id: node.id },

@@ -72,7 +72,7 @@ a:hover {
         "main main main"
         "footer footer footer";
 
-    background: linear-gradient(90deg, #eee, #fff, #eee);
+    background: #eee;
 }
 
 .siteRoot > div.bg {
@@ -86,10 +86,16 @@ a:hover {
 div.bg-left {
     flex: 1;
     background: linear-gradient(90deg, #eee, #fff);
+    background-position: right;
+    background-size: 400px auto;
+    background-repeat: no-repeat;
 }
 div.bg-right {
     flex: 1;
     background: linear-gradient(90deg, #fff, #eee);
+    background-position: left;
+    background-size: 400px auto;
+    background-repeat: no-repeat;
 }
 div.bg-main {
     width: 100%;

@@ -7,6 +7,31 @@ module.exports = {
         description: `Pratical solutions to everyday problems`,
     },
     plugins: [
+        // Read in Markdown files for further processing
+        {
+            resolve: `gatsby-source-filesystem`,
+            options: {
+                path: `${__dirname}/src/pages/`,
+                name: `pages`,
+            },
+        },
+        {
+            resolve: `gatsby-source-filesystem`,
+            options: {
+                path: `${__dirname}/src/posts/`,
+                name: `posts`,
+            },
+        },
+        {
+            // Gatsby forcibly adds a `gatsby-plugin-page-creator` plugin to process src/pages.
+            // However, we can override it's settings by using the same path and changing the options.
+            // We set it to ignore .mdx files because we will process them ourselves in gatsby-node.js
+            resolve: `gatsby-plugin-page-creator`,
+            options: {
+                path: `${__dirname}/src/pages`,
+                ignore: [`**/*.!(tsx)`],
+            },
+        },
         {
             resolve: `gatsby-plugin-sitemap`,
             options: {
@@ -18,11 +43,14 @@ module.exports = {
                     data.sort((left, right) => (left.url < right.url ? -1 : left.url > right.url ? 1 : 0));
                     return data;
                 },
+                exclude: ["/test/*"],
             },
         },
         {
             resolve: `gatsby-plugin-robots-txt`,
-            options: {},
+            options: {
+                host: `aschultz.github.io`,
+            },
         },
         {
             resolve: "gatsby-plugin-html-attributes",
@@ -48,9 +76,9 @@ module.exports = {
                     {
                         resolve: `gatsby-remark-images`,
                         options: {
-                            maxWidth: 800,
+                            maxWidth: 1920,
                             quality: 90,
-                            srcSetBreakpoints: [200, 400, 800],
+                            srcSetBreakpoints: [200, 400, 600],
                         },
                     },
                     {
@@ -80,20 +108,6 @@ module.exports = {
                 jsxPragma: `jsx`, // defaults to "React"
                 allExtensions: true, // defaults to false
                 onlyRemoveTypeImports: true, //defaults to false
-            },
-        },
-        // {
-        //     resolve: `gatsby-source-filesystem`,
-        //     options: {
-        //         path: `${__dirname}/src/pages`,
-        //         name: `pages`,
-        //     },
-        // },
-        {
-            resolve: `gatsby-source-filesystem`,
-            options: {
-                path: `${__dirname}/src/posts`,
-                name: `posts`,
             },
         },
     ],

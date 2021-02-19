@@ -9,23 +9,18 @@ import { Layout } from "./layout";
 // By default, only standard React HTML tags are available.
 const mdxComponents = {};
 
-export default function Post({ data }: any) {
+export default function Page({ data }: any) {
     const { frontmatter, body } = data.mdx;
     return (
         <>
             <Helmet defer={false}>
                 <title>{frontmatter.title}</title>
-                <meta name="description" content={frontmatter.summary} />
+                <meta name="description" content={frontmatter.description} />
             </Helmet>
             <Layout>
-                <article className="cbox" itemScope itemType="http://schema.org/Article">
-                    <header className="ccontent">
-                        <h1 itemProp="name headline">{frontmatter.title}</h1>
-                        <time itemProp="datePublished" dateTime={frontmatter.date}>
-                            {frontmatter.formattedDate}
-                        </time>
-                    </header>
-                    <div className="ccontent" itemProp="articleBody">
+                <article className="cbox">
+                    <h1>{frontmatter.title}</h1>
+                    <div className="ccontent">
                         <MDXProvider components={mdxComponents}>
                             <MDXRenderer>{body}</MDXRenderer>
                         </MDXProvider>
@@ -41,13 +36,9 @@ export const pageQuery = graphql`
         mdx(id: { eq: $id }) {
             body
             frontmatter {
-                ... on ArticleFrontmatter {
-                    date
-                    formattedDate: date(formatString: "MMMM DD, YYYY")
+                ... on PageFrontmatter {
                     title
-                    subtitle
-                    excerpt
-                    summary
+                    description
                 }
             }
         }

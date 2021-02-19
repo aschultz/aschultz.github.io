@@ -5,7 +5,7 @@ import { Layout } from "../components/layout";
 
 export default function Home({ data }: any) {
     const { siteMetadata } = data.site;
-    const { edges: posts } = data.allMdx;
+    const { edges: posts } = data.allBlogPost;
 
     return (
         <>
@@ -17,13 +17,13 @@ export default function Home({ data }: any) {
             <Layout>
                 {posts.map(({ node: post }) => (
                     <article className="ccontent">
-                        <Link to={post.fields.slug}>
-                            <h1 itemProp="name headline">{post.frontmatter.title}</h1>
+                        <Link to={post.slug}>
+                            <h1 itemProp="name headline">{post.title}</h1>
                         </Link>
-                        <time itemProp="datePublished" dateTime={post.frontmatter.date}>
-                            {post.frontmatter.formattedDate}
+                        <time itemProp="datePublished" dateTime={post.date}>
+                            {post.formattedDate}
                         </time>
-                        <p>{post.frontmatter.excerpt || post.excerpt}</p>
+                        <p>{post.parent.excerpt}</p>
                     </article>
                 ))}
             </Layout>
@@ -39,21 +39,19 @@ export const pageQuery = graphql`
                 description
             }
         }
-        allMdx(sort: { fields: frontmatter___date, order: DESC }, filter: { fields: { collection: { eq: "posts" } } }) {
+        allBlogPost {
             edges {
                 node {
-                    id
-                    excerpt(pruneLength: 280)
-                    fields {
-                        slug
-                    }
-                    frontmatter {
-                        date
-                        formattedDate: date(formatString: "MMMM DD, YYYY")
-                        title
-                        subtitle
-                        excerpt
-                        summary
+                    slug
+                    date
+                    formattedDate: date(formatString: "MMMM DD, YYYY")
+                    title
+                    subtitle
+                    summary
+                    parent {
+                        ... on Mdx {
+                            excerpt
+                        }
                     }
                 }
             }
