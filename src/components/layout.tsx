@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link } from "gatsby";
 import "./_reset.css";
 // import "katex/dist/katex.min.css";
@@ -10,6 +10,22 @@ import LinkedInLogo from "../assets/LinkedIn.inline.svg";
 // https://www.gatsbyjs.com/docs/reference/built-in-components/gatsby-link/
 
 export function Layout(props: any) {
+    useEffect(() => {
+        if (window) {
+            const onResize = () => {
+                document.documentElement.style.setProperty(
+                    "--scrollbar-width",
+                    window.innerWidth - document.documentElement.clientWidth + "px"
+                );
+                // Viewport width without scrollbar
+                document.documentElement.style.setProperty("--vw", document.documentElement.clientWidth / 100 + "px");
+            };
+            window.addEventListener("resize", onResize);
+            onResize();
+            return () => window.removeEventListener("resize", onResize);
+        }
+    }, []);
+
     return (
         <div className="siteRoot">
             <div className="bg">

@@ -59,25 +59,30 @@ a:hover {
 :root {
     --site-mainWidth: 700px;
 }
+
 .siteRoot {
     min-height: 100vh;
+    position: relative;
 
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: 1fr;
     grid-template-rows: auto 1fr auto;
     grid-auto-columns: 0;
     grid-auto-rows: 0;
     grid-template-areas:
-        "header header header"
-        "main main main"
-        "footer footer footer";
+        "header"
+        "main"
+        "footer";
 
     background: #eee;
 }
 
 .siteRoot > div.bg {
-    grid-row: 1 / -1;
-    grid-column: 1/-1;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
     display: flex;
     flex-direction: row;
     justify-content: center;
@@ -113,6 +118,7 @@ div.bg-main {
     display: flex;
     justify-content: center;
     background: #ffffff;
+    position: relative;
 }
 
 .siteNav {
@@ -135,7 +141,6 @@ div.bg-main {
 }
 
 .siteNav > a {
-    flex: 1;
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -201,7 +206,14 @@ div.bg-main {
 main {
     grid-area: main;
     /* outline: 0.1px solid red; */
-    padding: 3em 0;
+    padding: 3em 16px;
+    max-width: var(--site-mainWidth);
+    margin: 0 auto;
+}
+
+.cbox {
+    position: relative;
+    margin-left: 15rem;
 }
 
 /*
@@ -210,10 +222,10 @@ main {
 main,
 .cbox,
 .ccontent {
-    width: 100%;
+    /* width: 100%;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: center; */
 }
 
 /* 
@@ -222,10 +234,15 @@ main,
     children to break out and go full width if they need.
 */
 .ccontent > * {
-    display: block;
+    /* display: block;
     width: 100%;
     max-width: var(--site-mainWidth);
-    padding: 0 16px;
+    padding: 0 16px; */
+}
+
+.fullwidth {
+    margin-left: calc(-50 * var(--vw, 1vw) + 50%);
+    margin-right: calc(-50 * var(--vw, 1vw) + 50%);
 }
 
 /*
@@ -234,7 +251,7 @@ main,
 .ccontent > * {
     margin-top: 0.8em;
 }
-.ccontent h2 {
+.ccontent > h2 {
     margin-top: 1.2em;
 }
 .ccontent > h1 {
@@ -295,4 +312,11 @@ th:last-child {
 
     display: flex;
     justify-content: center;
+    position: relative;
+}
+
+aside {
+    position: absolute;
+    left: -15rem;
+    width: 15rem;
 }

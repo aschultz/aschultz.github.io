@@ -15,17 +15,19 @@ export default function Home({ data }: any) {
                 <meta name="msvalidate.01" content="E4CFADA6D27D25819472B16E008624A8" />
             </Helmet>
             <Layout>
-                {posts.map(({ node: post }) => (
-                    <article className="ccontent">
-                        <Link to={post.slug}>
-                            <h1 itemProp="name headline">{post.title}</h1>
-                        </Link>
-                        <time itemProp="datePublished" dateTime={post.date}>
-                            {post.formattedDate}
-                        </time>
-                        <p>{post.parent.excerpt}</p>
-                    </article>
-                ))}
+                <div className="cbox">
+                    {posts.map(({ node: post }) => (
+                        <article className="ccontent">
+                            <Link to={post.slug}>
+                                <h1 itemProp="name headline">{post.title}</h1>
+                            </Link>
+                            <time itemProp="datePublished" dateTime={post.date}>
+                                {post.formattedDate}
+                            </time>
+                            <p>{post.parent.excerpt}</p>
+                        </article>
+                    ))}
+                </div>
             </Layout>
         </>
     );
