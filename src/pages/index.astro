@@ -1,0 +1,27 @@
+---
+import RootLayout from '../components/rootLayout.astro';
+import { getPosts } from '../content/config';
+
+const site = {
+    title: "",
+    description: ""
+};
+const posts = await getPosts();
+---
+<RootLayout title={site.title} description={site.description}>
+    <meta slot="head" name="msvalidate.01" content="E4CFADA6D27D25819472B16E008624A8" />
+
+    {posts.map((post) => (
+        <article class="sitegrid ccontent">
+            <a href={post.url}>
+                <h1 itemprop="name headline">{post.data.title}</h1>
+            </a>
+            <time itemprop="datePublished" datetime={post.data.date.toISOString()}>
+                {post.data.date.toLocaleString("en-us", {
+                    dateStyle: "medium"
+                })}
+            </time>
+            <p>{post.data.summary}</p>
+        </article>
+    ))}
+</RootLayout>

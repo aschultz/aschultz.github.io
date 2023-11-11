@@ -1,0 +1,214 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><link rel="preload" href="/fonts/UrbanistGX.ttf" as="font" type="font/ttf"><link rel="canonical" href="https://aschultz.github.io/posts/2013/2013-06-27_uuid/"><title>Serializing Universal Unique Identifiers</title><meta name="title" content="Serializing Universal Unique Identifiers"><meta name="description" content="Taking a look at Guid internals to understand why they don't serialize quite as you would expect."><link rel="stylesheet" href="/astro/about.db97af40.css" /></head><body><div class="siteRoot"><div class="bg"><div class="bg-left"></div><div class="bg-main"></div><div class="bg-right"></div></div><header><nav class="siteNav"><a href="/"><h1>a.schultz</h1></a><ul><li><a href="/about/">About</a></li><li><a href="https://github.com/aschultz" title="GitHub"><img src="/icons/GitHub-Mark.inline.svg"></a></li><li><a href="https://www.linkedin.com/in/-aschultz" title="LinkedIn"><img src="/icons/LinkedIn.inline.svg"></a></li></ul></nav></header><main><article class="cbox" itemscope itemtype="http://schema.org/Article"><header class="ccontent"><h1 itemprop="name headline">Serializing Universal Unique Identifiers</h1><time itemprop="datePublished" datetime="2013-06-27T00:00:00.000Z">Wed Jun 26 2013 17:00:00 GMT-0700 (Pacific Daylight Time)</time></header><div class="ccontent" itemprop="articleBody"><p>Of late I’ve been writing a fair amount of parsing code for some MPEG-4 ISO base media file format content (ISOBMFF from here on). These files are rather straightforward to parse: you can define a basic catch-all structure and add functionality for parsing specific chunks as you go. One issue I ran into recently, however, was a need to parse out some <code>byte[16]</code> blobs containing unique identifiers and display them as the hexadecimal UUIDs we’re familiar with (e.g. <code>6f8db96c-2908-4250-ba92-9a2d67ce6007</code>). Having written my parser in C#, my first thought was to do the following:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" lang="csharp"><code><span class="line"><span style="color:#F97583">byte</span><span style="color:#E1E4E8">[] </span><span style="color:#B392F0">data</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> parser.</span><span style="color:#B392F0">ReadByteArray</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">16</span><span style="color:#E1E4E8">); </span><span style="color:#6A737D">//Read in UUID data from file</span></span>
+<span class="line"><span style="color:#B392F0">Guid</span><span style="color:#B392F0"> guid</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Guid</span><span style="color:#E1E4E8">(data);</span></span>
+<span class="line"><span style="color:#F97583">string</span><span style="color:#B392F0"> formattedUuid</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> guid.</span><span style="color:#B392F0">ToString</span><span style="color:#E1E4E8">();</span></span></code></pre>
+<p>Unfortunately, this has a nasty problem.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" lang="csharp"><code><span class="line"><span style="color:#6A737D">// Lets say my original UUID was:</span></span>
+<span class="line"><span style="color:#F97583">string</span><span style="color:#B392F0"> uuidString</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "DEADBEEF-CAFE-BABE-DEED-0123456789AB"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// In binary form, per the UUID spec, this should be represented as the following:</span></span>
+<span class="line"><span style="color:#F97583">byte</span><span style="color:#E1E4E8">[] </span><span style="color:#B392F0">uuidBytes</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#F97583"> byte</span><span style="color:#E1E4E8">[]{ </span><span style="color:#79B8FF">0xDE</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0xAD</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0xBE</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0xEF</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0xCA</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0xFE</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0xBA</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0xBE</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">                               0xDE</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0xED</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0x01</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0x23</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0x45</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0x67</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0x89</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0xAB</span><span style="color:#E1E4E8"> };</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Lets try some things...</span></span>
+<span class="line"><span style="color:#B392F0">Guid</span><span style="color:#B392F0"> guidFromString</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Guid</span><span style="color:#E1E4E8">(uuidString);</span></span>
+<span class="line"><span style="color:#B392F0">Guid</span><span style="color:#B392F0"> guidFromData</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Guid</span><span style="color:#E1E4E8">(uuidBytes);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">guidFromString.</span><span style="color:#B392F0">ToString</span><span style="color:#E1E4E8">();     </span><span style="color:#6A737D">// DEADBEEF-CAFE-BABE-DEED-0123456789AB</span></span>
+<span class="line"><span style="color:#E1E4E8">guidFromString.</span><span style="color:#B392F0">ToByteArray</span><span style="color:#E1E4E8">();  </span><span style="color:#6A737D">// EF-BE-AD-DE-FE-CA-BE-BA-DE-ED-01-23-45-67-89-AB</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">guidFromData.</span><span style="color:#B392F0">ToString</span><span style="color:#E1E4E8">();     </span><span style="color:#6A737D">// EFBEADDE-FECA-BEBA-DEED-0123456789AB</span></span>
+<span class="line"><span style="color:#E1E4E8">guidFromData.</span><span style="color:#B392F0">ToByteArray</span><span style="color:#E1E4E8">();  </span><span style="color:#6A737D">// DE-AD-BE-EF-CA-FE-BA-BE-DE-ED-01-23-45-67-89-AB</span></span></code></pre>
+<p>Say what? Why do the string and byte representations not match? And why are only the first three sections getting shuffled around?</p>
+<h2 id="guids-are-tricky-buggers">Guids are tricky buggers</h2>
+<p>Observe the Windows <a href="https://docs.microsoft.com/en-us/windows/win32/api/guiddef/ns-guiddef-guid">GUID</a> structure. It stores its fields as follows (.NET does the same):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" lang="cpp"><code><span class="line"><span style="color:#F97583">typedef</span><span style="color:#F97583"> struct</span><span style="color:#B392F0"> _GUID</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  DWORD Data1;</span></span>
+<span class="line"><span style="color:#E1E4E8">  WORD  Data2;</span></span>
+<span class="line"><span style="color:#E1E4E8">  WORD  Data3;</span></span>
+<span class="line"><span style="color:#E1E4E8">  BYTE  Data4[</span><span style="color:#79B8FF">8</span><span style="color:#E1E4E8">];</span></span>
+<span class="line"><span style="color:#E1E4E8">} </span><span style="color:#B392F0">GUID</span><span style="color:#E1E4E8">;</span></span></code></pre>
+<p>See the issue? A clue: your processor might have something to do with it.</p>
+<p>When a .NET Guid object is created from a string, the Guid constructor knows that the values in the string are a <a href="https://en.wikipedia.org/wiki/Endianness">big-endian</a> representation of the fields. The hex is parsed and stored into these fields so that the value remains the same — for example, 0xDEADBEEF is 3735928559, so the value 3735928559 is stored in Data1. 0xCAFE is 51966, so Data2 = 51966, and so on.</p>
+<p>When <code>ToString()</code> is called, the method will build a string that is back in the big-endian order. The string you put in is the string you get out.</p>
+<p><strong>However</strong>, when a Guid created this way is serialized via the <code>ToByteArray()</code> method, it is essentially performing a <a href="https://www.cplusplus.com/reference/cstring/memcpy/">memcpy</a> of the structure. This means the binary representation is affected by the endianness of the system.</p>
+<p>The x86 and x86-64 architectures are little-endian. That DWORD value 3735928559 we previously stored is ordered in memory as 0xEFBEADDE. Each byte in Data4, meanwhile, is the same coming out as it was going in because endianness only affects the arrangement of bytes within a multi-byte field, not the order of bits within a single byte. ‘DEED-123456789AB’ (8 bytes total) is stored in the Data4 array, a sequence of individual bytes, hence why it remains the same throughout our tests while the the first three sections get shuffled around.</p>
+<p>Take note that when a Guid is created from a byte[], the assumption is that the input array is in the same order as what ToByteArray spits out. Again, all it does is <code>memcpy</code> the data. If you pass it bytes in big-endian order, then call <code>ToString()</code>, you’ll get a string in little-endian order.</p>
+<h2 id="the-takeaway">The takeaway</h2>
+<p>Given a string representation of a UUID, the .NET Guid object will input/output a matching string (big-endian order), but input/output of binary data is in little-endian order. Since this is annoying to remember, I’ve written up a simple Uuid structure below to help out by homogenizing the inputs and outputs.</p>
+<h2 id="code-sample">Code Sample</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" lang="csharp"><code><span class="line"><span style="color:#6A737D">/// &#x3C;</span><span style="color:#85E89D">summary</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#6A737D">/// UUID implementation based on Guid. Behaves like a Guid except that inputs and outputs</span></span>
+<span class="line"><span style="color:#6A737D">/// (such as byte[] and strings) are consistent and match a fully big-endian representation</span></span>
+<span class="line"><span style="color:#6A737D">/// of the UUID structure.</span></span>
+<span class="line"><span style="color:#6A737D">/// &#x3C;/</span><span style="color:#85E89D">summary</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#E1E4E8">[</span><span style="color:#B392F0">Serializable</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> struct</span><span style="color:#B392F0"> Uuid</span><span style="color:#E1E4E8"> : </span><span style="color:#B392F0">IFormattable</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">IComparable</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">IComparable</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Uuid</span><span style="color:#E1E4E8">>, </span><span style="color:#B392F0">IEquatable</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Uuid</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#6A737D">    //Internally, we use a Guid so that we can take advantage of most of its functionality.</span></span>
+<span class="line"><span style="color:#F97583">    private</span><span style="color:#B392F0"> Guid</span><span style="color:#B392F0"> guid</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> readonly</span><span style="color:#B392F0"> Uuid</span><span style="color:#B392F0"> Empty</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Uuid</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    /// &#x3C;</span><span style="color:#85E89D">summary</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#6A737D">    /// Creates a UUID from an array of bytes.</span></span>
+<span class="line"><span style="color:#6A737D">    /// Calls to ToString and ToByteArray will retrieve values in the same order as this initial input.</span></span>
+<span class="line"><span style="color:#6A737D">    /// &#x3C;/</span><span style="color:#85E89D">summary</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#6A737D">    /// &#x3C;</span><span style="color:#85E89D">param</span><span style="color:#B392F0"> name</span><span style="color:#6A737D">=</span><span style="color:#9ECBFF">"uuid"</span><span style="color:#6A737D">>&#x3C;/</span><span style="color:#85E89D">param</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#B392F0"> Uuid</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">byte</span><span style="color:#E1E4E8">[] </span><span style="color:#B392F0">uuidData</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> (BitConverter.IsLittleEndian)</span></span>
+<span class="line"><span style="color:#E1E4E8">        {</span></span>
+<span class="line"><span style="color:#6A737D">            //Little-endian system, so we need to deal with the mismatch between the input layout</span></span>
+<span class="line"><span style="color:#6A737D">            //and Guid's in-memory layout. We can solve this by reading the bytes into fields ourselves.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">            Int32</span><span style="color:#B392F0"> data1</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> ((((((uuidData[</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">&#x3C;&#x3C;</span><span style="color:#79B8FF"> 8</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">|</span><span style="color:#E1E4E8"> uuidData[</span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">]) </span><span style="color:#F97583">&#x3C;&#x3C;</span><span style="color:#79B8FF"> 8</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">|</span><span style="color:#E1E4E8"> uuidData[</span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">]) </span><span style="color:#F97583">&#x3C;&#x3C;</span><span style="color:#79B8FF"> 8</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">|</span><span style="color:#E1E4E8"> uuidData[</span><span style="color:#79B8FF">3</span><span style="color:#E1E4E8">]);</span></span>
+<span class="line"><span style="color:#B392F0">            Int16</span><span style="color:#B392F0"> data2</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> (</span><span style="color:#B392F0">Int16</span><span style="color:#E1E4E8">)((uuidData[</span><span style="color:#79B8FF">4</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">&#x3C;&#x3C;</span><span style="color:#79B8FF"> 8</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">|</span><span style="color:#E1E4E8"> uuidData[</span><span style="color:#79B8FF">5</span><span style="color:#E1E4E8">]);</span></span>
+<span class="line"><span style="color:#B392F0">            Int16</span><span style="color:#B392F0"> data3</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> (</span><span style="color:#B392F0">Int16</span><span style="color:#E1E4E8">)((uuidData[</span><span style="color:#79B8FF">6</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">&#x3C;&#x3C;</span><span style="color:#79B8FF"> 8</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">|</span><span style="color:#E1E4E8"> uuidData[</span><span style="color:#79B8FF">7</span><span style="color:#E1E4E8">]);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">            guid </span><span style="color:#F97583">=</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Guid</span><span style="color:#E1E4E8">(data1, data2, data3, uuidData[</span><span style="color:#79B8FF">8</span><span style="color:#E1E4E8">], uuidData[</span><span style="color:#79B8FF">9</span><span style="color:#E1E4E8">], uuidData[</span><span style="color:#79B8FF">10</span><span style="color:#E1E4E8">], uuidData[</span><span style="color:#79B8FF">11</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#E1E4E8">                                                 uuidData[</span><span style="color:#79B8FF">12</span><span style="color:#E1E4E8">], uuidData[</span><span style="color:#79B8FF">13</span><span style="color:#E1E4E8">], uuidData[</span><span style="color:#79B8FF">14</span><span style="color:#E1E4E8">], uuidData[</span><span style="color:#79B8FF">15</span><span style="color:#E1E4E8">]);</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#F97583">        else</span></span>
+<span class="line"><span style="color:#E1E4E8">        {</span></span>
+<span class="line"><span style="color:#6A737D">            //Big-endian system, so Guid's in-memory layout already matches incoming Uuid byte ordering.</span></span>
+<span class="line"><span style="color:#6A737D">            //We can allow Guid to use its shortcut memcpy construction routine.</span></span>
+<span class="line"><span style="color:#E1E4E8">            guid </span><span style="color:#F97583">=</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Guid</span><span style="color:#E1E4E8">(uuidData);</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    /// &#x3C;</span><span style="color:#85E89D">summary</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#6A737D">    /// Creates a UUID from a hexadecimal string representation of the format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX.</span></span>
+<span class="line"><span style="color:#6A737D">    /// Calls to ToString and ToByteArray will retrieve values in the same order as this initial input.</span></span>
+<span class="line"><span style="color:#6A737D">    /// &#x3C;/</span><span style="color:#85E89D">summary</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#6A737D">    /// &#x3C;</span><span style="color:#85E89D">param</span><span style="color:#B392F0"> name</span><span style="color:#6A737D">=</span><span style="color:#9ECBFF">"uuid"</span><span style="color:#6A737D">>&#x3C;/</span><span style="color:#85E89D">param</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#B392F0"> Uuid</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> uuid</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#E1E4E8">        guid </span><span style="color:#F97583">=</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Guid</span><span style="color:#E1E4E8">(uuid);</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    /// &#x3C;</span><span style="color:#85E89D">summary</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#6A737D">    /// Creates a UUID from a Windows Guid object.</span></span>
+<span class="line"><span style="color:#6A737D">    /// Calls to ToString will retrieve values matching Guid.ToString.</span></span>
+<span class="line"><span style="color:#6A737D">    /// Calls to ToByteArray will retrieve an array with values in the same order as the string representation.</span></span>
+<span class="line"><span style="color:#6A737D">    /// &#x3C;/</span><span style="color:#85E89D">summary</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#6A737D">    /// &#x3C;</span><span style="color:#85E89D">param</span><span style="color:#B392F0"> name</span><span style="color:#6A737D">=</span><span style="color:#9ECBFF">"guid"</span><span style="color:#6A737D">>&#x3C;/</span><span style="color:#85E89D">param</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#B392F0"> Uuid</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">Guid</span><span style="color:#B392F0"> guid</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#79B8FF">        this</span><span style="color:#E1E4E8">.guid </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> guid;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    /// &#x3C;</span><span style="color:#85E89D">summary</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#6A737D">    /// Retrieves a byte array representation of the UUID. Byte order matches the ToString representation.</span></span>
+<span class="line"><span style="color:#6A737D">    /// &#x3C;/</span><span style="color:#85E89D">summary</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#6A737D">    /// &#x3C;</span><span style="color:#85E89D">returns</span><span style="color:#6A737D">>&#x3C;/</span><span style="color:#85E89D">returns</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> byte</span><span style="color:#E1E4E8">[] </span><span style="color:#B392F0">ToByteArray</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#6A737D">        //ToByteArray returns a memcpy of the Guid structure</span></span>
+<span class="line"><span style="color:#F97583">        byte</span><span style="color:#E1E4E8">[] </span><span style="color:#B392F0">guidData</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> guid.</span><span style="color:#B392F0">ToByteArray</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> (BitConverter.IsLittleEndian)</span></span>
+<span class="line"><span style="color:#E1E4E8">        {</span></span>
+<span class="line"><span style="color:#6A737D">            //Convert little-endian in-memory representation back into big-endian order</span></span>
+<span class="line"><span style="color:#E1E4E8">            Array.</span><span style="color:#B392F0">Reverse</span><span style="color:#E1E4E8">(guidData, </span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">4</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">            Array.</span><span style="color:#B392F0">Reverse</span><span style="color:#E1E4E8">(guidData, </span><span style="color:#79B8FF">4</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">            Array.</span><span style="color:#B392F0">Reverse</span><span style="color:#E1E4E8">(guidData, </span><span style="color:#79B8FF">6</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> guidData;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> static</span><span style="color:#B392F0"> Uuid</span><span style="color:#B392F0"> NewUuid</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Uuid</span><span style="color:#E1E4E8">() { guid </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> Guid.</span><span style="color:#B392F0">NewGuid</span><span style="color:#E1E4E8">() };</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> bool</span><span style="color:#F97583"> operator</span><span style="color:#B392F0"> !=</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">Uuid</span><span style="color:#B392F0"> a</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Uuid</span><span style="color:#B392F0"> b</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> a.guid </span><span style="color:#F97583">!=</span><span style="color:#E1E4E8"> b.guid;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> bool</span><span style="color:#F97583"> operator</span><span style="color:#B392F0"> ==</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">Uuid</span><span style="color:#B392F0"> a</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Uuid</span><span style="color:#B392F0"> b</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> a.guid </span><span style="color:#F97583">==</span><span style="color:#E1E4E8"> b.guid;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> bool</span><span style="color:#B392F0"> Equals</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">Uuid</span><span style="color:#B392F0"> u</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> guid.</span><span style="color:#B392F0">Equals</span><span style="color:#E1E4E8">(u.guid);</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> override</span><span style="color:#F97583"> bool</span><span style="color:#B392F0"> Equals</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">object</span><span style="color:#B392F0"> o</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8">(o </span><span style="color:#F97583">is</span><span style="color:#B392F0"> Uuid</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">Equals</span><span style="color:#E1E4E8">((</span><span style="color:#B392F0">Uuid</span><span style="color:#E1E4E8">)o);</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#79B8FF"> false</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> override</span><span style="color:#F97583"> int</span><span style="color:#B392F0"> GetHashCode</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> guid.</span><span style="color:#B392F0">GetHashCode</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> int</span><span style="color:#B392F0"> CompareTo</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">Uuid</span><span style="color:#B392F0"> value</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> guid.</span><span style="color:#B392F0">CompareTo</span><span style="color:#E1E4E8">(value.guid);</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> int</span><span style="color:#B392F0"> CompareTo</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">Object</span><span style="color:#B392F0"> value</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> (value </span><span style="color:#F97583">is</span><span style="color:#B392F0"> Uuid</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#E1E4E8"> guid.</span><span style="color:#B392F0">CompareTo</span><span style="color:#E1E4E8">(((</span><span style="color:#B392F0">Uuid</span><span style="color:#E1E4E8">)value).guid);</span></span>
+<span class="line"><span style="color:#F97583">        else</span></span>
+<span class="line"><span style="color:#F97583">            throw</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> ArgumentException</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Value must be of type Uuid"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    /// &#x3C;</span><span style="color:#85E89D">summary</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#6A737D">    /// Retrieves a hexadecimal string representation with each byte corresponding</span></span>
+<span class="line"><span style="color:#6A737D">    /// to a hex tuple in left-to-right order, in the format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX</span></span>
+<span class="line"><span style="color:#6A737D">    /// &#x3C;/</span><span style="color:#85E89D">summary</span><span style="color:#6A737D">></span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> override</span><span style="color:#F97583"> string</span><span style="color:#B392F0"> ToString</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> guid.</span><span style="color:#B392F0">ToString</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> string</span><span style="color:#B392F0"> ToString</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> format</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> guid.</span><span style="color:#B392F0">ToString</span><span style="color:#E1E4E8">(format);</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> string</span><span style="color:#B392F0"> ToString</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> format</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">IFormatProvider</span><span style="color:#B392F0"> provider</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> guid.</span><span style="color:#B392F0">ToString</span><span style="color:#E1E4E8">(format, provider);</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> bool</span><span style="color:#B392F0"> TryParse</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> input</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">out</span><span style="color:#B392F0"> Uuid</span><span style="color:#B392F0"> result</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#B392F0">        Guid</span><span style="color:#B392F0"> guidResult</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> (Guid.</span><span style="color:#B392F0">TryParse</span><span style="color:#E1E4E8">(input, </span><span style="color:#F97583">out</span><span style="color:#E1E4E8"> guidResult))</span></span>
+<span class="line"><span style="color:#E1E4E8">        {</span></span>
+<span class="line"><span style="color:#E1E4E8">            result </span><span style="color:#F97583">=</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Uuid</span><span style="color:#E1E4E8">() { guid </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> guidResult };</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#79B8FF"> true</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#F97583">        else</span></span>
+<span class="line"><span style="color:#E1E4E8">        {</span></span>
+<span class="line"><span style="color:#E1E4E8">            result </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> Uuid.Empty;</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#79B8FF"> false</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#F97583"> static</span><span style="color:#F97583"> bool</span><span style="color:#B392F0"> TryParseExact</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#B392F0"> input</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">string</span><span style="color:#B392F0"> format</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">out</span><span style="color:#B392F0"> Uuid</span><span style="color:#B392F0"> result</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#B392F0">        Guid</span><span style="color:#B392F0"> guidResult</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> (Guid.</span><span style="color:#B392F0">TryParseExact</span><span style="color:#E1E4E8">(input, format, </span><span style="color:#F97583">out</span><span style="color:#E1E4E8"> guidResult))</span></span>
+<span class="line"><span style="color:#E1E4E8">        {</span></span>
+<span class="line"><span style="color:#E1E4E8">            result </span><span style="color:#F97583">=</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Uuid</span><span style="color:#E1E4E8">() { guid </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> guidResult };</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#79B8FF"> true</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#F97583">        else</span></span>
+<span class="line"><span style="color:#E1E4E8">        {</span></span>
+<span class="line"><span style="color:#E1E4E8">            result </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> Uuid.Empty;</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#79B8FF"> false</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre></div></article></main><footer></footer></div></body></html>

@@ -1,0 +1,89 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><link rel="preload" href="/fonts/UrbanistGX.ttf" as="font" type="font/ttf"><link rel="canonical" href="https://aschultz.github.io/posts/2015/2015-08-14_excel/"><title>Excel-ing at the speed of C</title><meta name="title" content="Excel-ing at the speed of C"><meta name="description" content="How to dynamically load native code from Excel"><link rel="stylesheet" href="/astro/about.db97af40.css" /></head><body><div class="siteRoot"><div class="bg"><div class="bg-left"></div><div class="bg-main"></div><div class="bg-right"></div></div><header><nav class="siteNav"><a href="/"><h1>a.schultz</h1></a><ul><li><a href="/about/">About</a></li><li><a href="https://github.com/aschultz" title="GitHub"><img src="/icons/GitHub-Mark.inline.svg"></a></li><li><a href="https://www.linkedin.com/in/-aschultz" title="LinkedIn"><img src="/icons/LinkedIn.inline.svg"></a></li></ul></nav></header><main><article class="cbox" itemscope itemtype="http://schema.org/Article"><header class="ccontent"><h1 itemprop="name headline">Excel-ing at the speed of C</h1><time itemprop="datePublished" datetime="2015-08-14T00:00:00.000Z">Thu Aug 13 2015 17:00:00 GMT-0700 (Pacific Daylight Time)</time></header><div class="ccontent" itemprop="articleBody"><p>Excel is a great tool, but some of its most powerful features are ancient or obscurely documented. Case in point: Excel includes a Visual Basic scripting system allowing for creation of custom macros and programmatic control over documents. It can be quite useful, but is ultimately limited by the VBA language and type system — stuck in a time before .NET, lacking even basic unsigned integer support. So what if we could break out of VBA and call into our own DLL?</p>
+<p>Thankfully, Excel can interop with basically any native DLL as long as it follows the right esoteric conventions. For example, let’s assume we have a simple C program that builds a DLL. It contains a method that takes an input and returns it.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" lang="cpp"><code><span class="line"><span style="color:#F97583">extern</span><span style="color:#9ECBFF"> "C"</span><span style="color:#F97583"> int</span><span style="color:#B392F0"> GetValue</span><span style="color:#E1E4E8">( </span><span style="color:#F97583">int</span><span style="color:#E1E4E8"> value )</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> value;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>In VBA, we can access this function like so:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" lang="vb"><code><span class="line"><span style="color:#6A737D">'' Declare the signature of the external function "GetValue" and where to find it</span></span>
+<span class="line"><span style="color:#F97583">Private</span><span style="color:#E1E4E8"> Declare</span><span style="color:#F97583"> Function </span><span style="color:#E1E4E8">GetValue Lib </span><span style="color:#9ECBFF">"C:\bin\MyLib.dll"</span><span style="color:#E1E4E8"> (ByVal value </span><span style="color:#F97583">As</span><span style="color:#79B8FF"> Long</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">As</span><span style="color:#79B8FF"> Long</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">''' Declare a method we can run in Excel editor for debugging/testing</span></span>
+<span class="line"><span style="color:#F97583">Public Sub </span><span style="color:#B392F0">TestMyLib</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">    Dim</span><span style="color:#E1E4E8"> retVal </span><span style="color:#F97583">As</span><span style="color:#79B8FF"> Long</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    retVal </span><span style="color:#F97583">=</span><span style="color:#B392F0"> GetValue</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">5</span><span style="color:#E1E4E8">) </span><span style="color:#6A737D">''' Will set retVal to 5</span></span>
+<span class="line"><span style="color:#F97583">End Function</span></span></code></pre>
+<p>There are several things to note here:</p>
+<ul>
+<li>The C/C++ library must define methods as <code>extern "C"</code> so that they are exported without any C++ style name mangling. This is necessary so that VBA can find the method by name.</li>
+<li>The data types in C and VB must match in size. An <code>int</code> in C being 32-bit corresponds to the <code>Long</code> 32-bit type in VB, not the <code>Integer</code> type which is only 16 bits. Mismatches will cause either an Overflow error or a crash.</li>
+<li>The VB method declaration requires specifying the path to the DLL. Normally this needs to be absolute; we’ll later discuss a workaround.</li>
+</ul>
+<p>Let’s take another step and say we want to read in a string storing an error code, convert it to a number, and send back a description of it.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" lang="cpp"><code><span class="line"><span style="color:#F97583">extern</span><span style="color:#9ECBFF"> "C"</span><span style="color:#E1E4E8"> VARIANT </span><span style="color:#B392F0">GetErrorDescription</span><span style="color:#E1E4E8">( BSTR bstrErrorCode )</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">    unsigned</span><span style="color:#F97583"> long</span><span style="color:#E1E4E8">   dwErrorCode      </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#F97583"> char</span><span style="color:#F97583">    *</span><span style="color:#E1E4E8"> pszErrName       </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> NULL</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">    BSTR            bstrErrorMessage </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> NULL</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">    int</span><span style="color:#E1E4E8">             cchErrorMessage  </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">    int</span><span style="color:#E1E4E8">             cchErrName       </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">    VARIANT         vnt;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Parse integer from input string</span></span>
+<span class="line"><span style="color:#E1E4E8">    dwErrorCode </span><span style="color:#F97583">=</span><span style="color:#B392F0"> wcstoul</span><span style="color:#E1E4E8">(bstrErrorCode, </span><span style="color:#79B8FF">NULL</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Call helper method that looks up the string for this error code</span></span>
+<span class="line"><span style="color:#E1E4E8">    pszErrName </span><span style="color:#F97583">=</span><span style="color:#B392F0"> GetErrorNameFromCode</span><span style="color:#E1E4E8">( dwErrorCode, </span><span style="color:#79B8FF">NULL</span><span style="color:#E1E4E8"> );</span></span>
+<span class="line"><span style="color:#E1E4E8">    cchErrName </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">int</span><span style="color:#E1E4E8">)</span><span style="color:#B392F0">strlen</span><span style="color:#E1E4E8">(pszErrName);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Convert message to UTF-16 so that we can store it in BSTR</span></span>
+<span class="line"><span style="color:#E1E4E8">    cchErrorMessage </span><span style="color:#F97583">=</span><span style="color:#B392F0"> MultiByteToWideChar</span><span style="color:#E1E4E8">(CP_UTF8, </span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">, pszErrName, cchErrName, </span><span style="color:#79B8FF">NULL</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">    bstrErrorMessage </span><span style="color:#F97583">=</span><span style="color:#B392F0"> SysAllocStringLen</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">, (</span><span style="color:#F97583">unsigned</span><span style="color:#F97583"> int</span><span style="color:#E1E4E8">)cchErrorMessage);</span></span>
+<span class="line"><span style="color:#B392F0">    MultiByteToWideChar</span><span style="color:#E1E4E8">(CP_UTF8, </span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">, pszErrName, cchErrName, bstrErrorMessage, cchErrorMessage);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Return as a VARIANT.</span></span>
+<span class="line"><span style="color:#6A737D">    // This is necessary to prevent VBA callers from mangling the string by</span></span>
+<span class="line"><span style="color:#6A737D">    // attempting to convert to UNICODE (VBA does this if the return value is just BSTR).</span></span>
+<span class="line"><span style="color:#B392F0">    VariantInit</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8">amp;amp;amp;amp;amp;vnt);</span></span>
+<span class="line"><span style="color:#E1E4E8">    vnt.vt </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> VT_BSTR;</span></span>
+<span class="line"><span style="color:#E1E4E8">    vnt.bstrVal </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> bstrErrorMessage;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" lang="vb"><code><span class="line"><span style="color:#F97583">Private</span><span style="color:#E1E4E8"> Declare</span><span style="color:#F97583"> Function </span><span style="color:#E1E4E8">GetErrorDescription Lib </span><span style="color:#9ECBFF">"C:\bin\MyLib.dll"</span><span style="color:#E1E4E8"> (ByVal value </span><span style="color:#F97583">As</span><span style="color:#79B8FF"> LongPtr</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">As</span><span style="color:#79B8FF"> Variant</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">''' Declare a method we can run in Excel editor for debugging/testing</span></span>
+<span class="line"><span style="color:#F97583">Public Sub </span><span style="color:#B392F0">TestMyLib</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">    Dim</span><span style="color:#E1E4E8"> retVal </span><span style="color:#F97583">As</span><span style="color:#79B8FF"> String</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    retVal </span><span style="color:#F97583">=</span><span style="color:#B392F0"> GetErrorDescription</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">StrPtr</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"5"</span><span style="color:#E1E4E8">))</span></span>
+<span class="line"><span style="color:#F97583">End Function</span></span></code></pre>
+<p>Clearly this is bit more complex.</p>
+<ul>
+<li>A string must be passed as a <code>BSTR</code>. Not <code>char</code>, <code>wchar</code>, <code>std::string</code>, or anything else. A <code>BSTR</code> is a special string data type designed for interop, containing a length-prefix, an array of wchar, and two null-terminating characters.</li>
+<li>Despite Excel using <code>BSTR</code> internally and our method taking <code>BSTR</code>, Excel will take any <code>String</code> parameter or return value in the VBA Declare statement and run it through a Unicode to ASCII conversion. To avoid the mess this causes, we pass a pointer to the incoming <code>BSTR</code> and return a <code>VARIANT</code> type containing a <code>BSTR</code>. That avoids any automatic conversions.</li>
+</ul>
+<h2 id="dynamic-paths">Dynamic Paths</h2>
+<p>At this point we can start using our native code do some heavy lifting, but we’re still stuck with a hard-coded path to the binary in our VBA. That’s rather limiting. We can leverage what we know so far, however, to hack in a solution.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" lang="vb"><code><span class="line"><span style="color:#F97583">Private</span><span style="color:#E1E4E8"> Declare</span><span style="color:#F97583"> Function </span><span style="color:#E1E4E8">LoadLibrary Lib </span><span style="color:#9ECBFF">"kernel32"</span><span style="color:#E1E4E8"> Alias </span><span style="color:#9ECBFF">"LoadLibraryA"</span><span style="color:#E1E4E8"> (ByVal lpLibFileName </span><span style="color:#F97583">As</span><span style="color:#79B8FF"> String</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">As</span><span style="color:#79B8FF"> LongPtr</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">Private</span><span style="color:#E1E4E8"> Declare</span><span style="color:#F97583"> Function </span><span style="color:#E1E4E8">GetErrorDescription Lib </span><span style="color:#9ECBFF">"MyLib.dll"</span><span style="color:#E1E4E8"> (ByVal value </span><span style="color:#F97583">As</span><span style="color:#79B8FF"> LongPtr</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">As</span><span style="color:#79B8FF"> Variant</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">Public Sub </span><span style="color:#B392F0">TestMyLib</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">    Static hasLoadedLib </span><span style="color:#F97583">As</span><span style="color:#79B8FF"> Boolean</span></span>
+<span class="line"><span style="color:#F97583">    Dim</span><span style="color:#E1E4E8"> retVal </span><span style="color:#F97583">As</span><span style="color:#79B8FF"> String</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    If</span><span style="color:#F97583"> Not</span><span style="color:#E1E4E8"> hasLoadedLib </span><span style="color:#F97583">Then</span></span>
+<span class="line"><span style="color:#F97583">        If</span><span style="color:#B392F0"> LoadLibrary</span><span style="color:#E1E4E8">(ThisWorkbook.Path </span><span style="color:#F97583">&#x26;</span><span style="color:#9ECBFF"> "\"</span><span style="color:#F97583"> &#x26;</span><span style="color:#9ECBFF"> "MyLib.dll"</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">&#x3C;></span><span style="color:#79B8FF"> 0</span><span style="color:#F97583"> Then</span></span>
+<span class="line"><span style="color:#E1E4E8">            hasLoadedLib </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> True</span></span>
+<span class="line"><span style="color:#F97583">        End If</span></span>
+<span class="line"><span style="color:#F97583">    End If</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    retVal </span><span style="color:#F97583">=</span><span style="color:#B392F0"> GetErrorDescription</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">StrPtr</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"5"</span><span style="color:#E1E4E8">))</span></span>
+<span class="line"><span style="color:#F97583">End Function</span></span></code></pre>
+<p>First, we modify the Declare statement for our lib to mention just the filename. Then, since system libraries are accessible without a full path, we can call the system’s LoadLibrary method to dynamically load our DLL from whatever path we want — in this case, the same folder as the workbook itself. Once the DLL is loaded into memory, Excel will happily use it without a second thought.</p>
+<h2 id="references">References</h2>
+<ul>
+<li><a href="https://msdn.microsoft.com/en-us/library/office/bb687915.aspx">How to: Access DLLs in Excel</a></li>
+<li><a href="http://blog.nkadesign.com/2013/vba-unicode-strings-and-the-windows-api/">VBA: Unicode Strings and the Windows API</a></li>
+<li><a href="https://docs.microsoft.com/en-us/archive/blogs/ericlippert/erics-complete-guide-to-bstr-semantics">Eric’s Complete Guide To BSTR Semantics</a></li>
+</ul></div></article></main><footer></footer></div></body></html>

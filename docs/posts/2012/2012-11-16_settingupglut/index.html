@@ -1,0 +1,79 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><link rel="preload" href="/fonts/UrbanistGX.ttf" as="font" type="font/ttf"><link rel="canonical" href="https://aschultz.github.io/posts/2012/2012-11-16_settingupglut/"><title>Setting Up: OpenGL + GLUT + Windows + Visual Studio</title><meta name="title" content="Setting Up: OpenGL + GLUT + Windows + Visual Studio"><meta name="description" content="How to set up a simple OpenGL app on Windows"><link rel="stylesheet" href="/astro/about.db97af40.css" /></head><body><div class="siteRoot"><div class="bg"><div class="bg-left"></div><div class="bg-main"></div><div class="bg-right"></div></div><header><nav class="siteNav"><a href="/"><h1>a.schultz</h1></a><ul><li><a href="/about/">About</a></li><li><a href="https://github.com/aschultz" title="GitHub"><img src="/icons/GitHub-Mark.inline.svg"></a></li><li><a href="https://www.linkedin.com/in/-aschultz" title="LinkedIn"><img src="/icons/LinkedIn.inline.svg"></a></li></ul></nav></header><main><article class="cbox" itemscope itemtype="http://schema.org/Article"><header class="ccontent"><h1 itemprop="name headline">Setting Up: OpenGL + GLUT + Windows + Visual Studio</h1><time itemprop="datePublished" datetime="2012-11-16T00:00:00.000Z">Thu Nov 15 2012 16:00:00 GMT-0800 (Pacific Standard Time)</time></header><div class="ccontent" itemprop="articleBody"><p>I was recently helping a friend get set up running OpenGL and I realized that most of the instructions available online for this are fairly outdated. So, here’s a quick run through to set the record straight. This guide is meant for beginners who just want to get a simple OpenGL desktop app going on a Windows machine.</p>
+<p>This guide assume you have the following installed:</p>
+<ol>
+<li>Windows 7 or newer</li>
+<li>Visual Studio 2008 or newer</li>
+</ol>
+<p>By convention, we assume the OS is installed to the C drive and VS is installed to a folder such as <code>C:\Program Files (x86)\Microsoft Visual Studio 10.0</code>. VS 2008 maps to 9.0, VS 2010 to 10.0, and VS 2012 to 11.0.</p>
+<h2 id="installing-glut">Installing GLUT</h2>
+<p>The first step is to download GLUT (the <a href="https://en.wikipedia.org/wiki/OpenGL_Utility_Toolkit">OpenGl Utility Toolkit</a>). This library provides a slew of helper functions for working with OpenGL, including setting up a window. Grab the latest binaries from <a href="https://user.xmission.com/~nate/glut.html">here</a>. Unzip this and copy the binaries out into the following directories. Be aware that these are 32-bit binaries. You will need to create the <code>gl</code> folder in <code>Microsoft Visual Studio 10.0\VC\include\</code>, as it doesn’t already exist.</p>
+<div>
+<table>
+<tbody>
+<tr><th></th><th>File</th><th>Destination Folder</th></tr>
+<tr><th rowspan="3">Windows 64-bit</th><td>glut32.dll</td><td>C:\Windows\SysWOW64\</td></tr>
+<tr><td>glut.h</td><td>C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\include\gl\</td></tr>
+<tr><td>glut32.lib</td><td>C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\lib\</td></tr>
+<tr><th rowspan="3">Windows 34-bit</th><td>glut32.dll</td><td>C:\Windows\System32\</td></tr>
+<tr><td>glut.h</td><td>C:\Program Files\Microsoft Visual Studio 10.0\VC\include\gl\</td></tr>
+<tr><td>glut32.lib</td><td>C:\Program Files\Microsoft Visual Studio 10.0\VC\lib\</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="creating-the-vs-project">Creating the VS project</h2>
+<p>Now boot up Visual Studio. You’ll want to create a simple Win32 console application. In VS 2010, open the New Project dialog and look at the list of templates. Select “Visual C++\Win32\Win32 Console Application”. Click through the Wizard that appears, leaving the defaults in place.</p>
+<p><img alt="Application settings dialogue"  src="/astro/Setup1.a4c31e92_EWE9w.webp" width="611" height="494" loading="lazy" decoding="async"></p>
+<h2 id="linking-the-libraries">Linking the libraries</h2>
+<p>At this point you should get a solution with a couple of default files and a <code>_tmain</code> entry function. Right-click the project you created, go to Properties, then open Configuration Properties\Linker\Input and add the following to the “Additional Dependencies” field: <code>opengl32.lib;glut32.lib;glu32.lib</code>.</p>
+<p><img alt="Project properties page"  src="/astro/Setup2.ee9d67a5_1eWtMh.webp" width="865" height="643" loading="lazy" decoding="async"></p>
+<h2 id="writing-the-code">Writing the code</h2>
+<p>Modify your main .cpp file to look like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" lang="cpp"><code><span class="line"><span style="color:#F97583">#include</span><span style="color:#9ECBFF"> "stdafx.h"</span></span>
+<span class="line"><span style="color:#F97583">#include</span><span style="color:#9ECBFF"> &#x3C;gl/glut.h></span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// One-time initializtion logic</span></span>
+<span class="line"><span style="color:#F97583">void</span><span style="color:#B392F0"> init</span><span style="color:#E1E4E8">( </span><span style="color:#F97583">void</span><span style="color:#E1E4E8"> )</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#B392F0">    printf</span><span style="color:#E1E4E8">( </span><span style="color:#9ECBFF">"OpenGL version: </span><span style="color:#79B8FF">%s\n</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">, (</span><span style="color:#F97583">char*</span><span style="color:#E1E4E8">)</span><span style="color:#B392F0">glGetString</span><span style="color:#E1E4E8">(GL_VERSION));</span></span>
+<span class="line"><span style="color:#B392F0">    printf</span><span style="color:#E1E4E8">( </span><span style="color:#9ECBFF">"OpenGL renderer: </span><span style="color:#79B8FF">%s\n</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">, (</span><span style="color:#F97583">char*</span><span style="color:#E1E4E8">)</span><span style="color:#B392F0">glGetString</span><span style="color:#E1E4E8">(GL_RENDERER));</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    //Configure basic OpenGL settings</span></span>
+<span class="line"><span style="color:#B392F0">    glClearColor</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">0.0</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0.0</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0.0</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">1.0</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">    glShadeModel</span><span style="color:#E1E4E8">(GL_SMOOTH);</span></span>
+<span class="line"><span style="color:#B392F0">    glEnable</span><span style="color:#E1E4E8">(GL_BLEND);</span></span>
+<span class="line"><span style="color:#B392F0">    glEnable</span><span style="color:#E1E4E8">(GL_TEXTURE_2D);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Main drawing routine. Called repeatedly by GLUT's main loop</span></span>
+<span class="line"><span style="color:#F97583">void</span><span style="color:#B392F0"> display</span><span style="color:#E1E4E8">( </span><span style="color:#F97583">void</span><span style="color:#E1E4E8"> )</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#6A737D">    //Clear the screen and set our initial view matrix</span></span>
+<span class="line"><span style="color:#B392F0">    glClear</span><span style="color:#E1E4E8">(GL_COLOR_BUFFER_BIT </span><span style="color:#F97583">|</span><span style="color:#E1E4E8"> GL_DEPTH_BUFFER_BIT </span><span style="color:#F97583">|</span><span style="color:#E1E4E8"> GL_STENCIL_BUFFER_BIT);</span></span>
+<span class="line"><span style="color:#B392F0">    glMatrixMode</span><span style="color:#E1E4E8">(GL_MODELVIEW);</span></span>
+<span class="line"><span style="color:#B392F0">    glLoadIdentity</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    //TODO: Perform drawing here</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    //We just drew to the back buffer. Now we need to swap that with the</span></span>
+<span class="line"><span style="color:#6A737D">    //front buffer to show it on screen.</span></span>
+<span class="line"><span style="color:#B392F0">    glutSwapBuffers</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Entry point - GLUT setup and initialization</span></span>
+<span class="line"><span style="color:#F97583">int</span><span style="color:#B392F0"> main</span><span style="color:#E1E4E8">( </span><span style="color:#F97583">int</span><span style="color:#FFAB70"> argc</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">char**</span><span style="color:#FFAB70"> argv</span><span style="color:#E1E4E8"> )</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">   glutInit</span><span style="color:#E1E4E8">( </span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8">argc, argv );</span></span>
+<span class="line"><span style="color:#B392F0">   glutInitDisplayMode</span><span style="color:#E1E4E8"> (GLUT_DEPTH </span><span style="color:#F97583">|</span><span style="color:#E1E4E8"> GLUT_DOUBLE </span><span style="color:#F97583">|</span><span style="color:#E1E4E8"> GLUT_RGB);</span></span>
+<span class="line"><span style="color:#B392F0">   glutInitWindowSize</span><span style="color:#E1E4E8"> (</span><span style="color:#79B8FF">800</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">600</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">   glutInitWindowPosition</span><span style="color:#E1E4E8"> (</span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">   glutCreateWindow</span><span style="color:#E1E4E8">( </span><span style="color:#9ECBFF">"OpenGL Test"</span><span style="color:#E1E4E8"> );</span></span>
+<span class="line"><span style="color:#B392F0">   glutDisplayFunc</span><span style="color:#E1E4E8">( display );</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">   init</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">   glutMainLoop</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">   return</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Hit F5 to build and run. You should get a window with a black screen. Pat yourself on the back. You’re now ready to start coding with OpenGL.</p></div></article></main><footer></footer></div></body></html>

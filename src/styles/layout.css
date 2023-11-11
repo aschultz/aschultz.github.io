@@ -1,0 +1,363 @@
+/*=============================================================
+                         FONTS
+=============================================================*/
+@font-face {
+    font-family: "Urbanist";
+    src: local("Urbanist") url("/fonts/UrbanistGX.ttf") format("truetype");
+    font-weight: 30 150;
+    font-display: swap;
+}
+
+:root {
+    --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
+        "Open Sans", "Helvetica Neue", sans-serif;
+    --font-mono: Menlo, Monaco, Consolas, "Andale Mono", "Ubuntu Mono", "Courier New", monospace;
+}
+
+html {
+    font-size: 62.5%; /* Set rem baseline to 10px on browser default text size */
+}
+
+body {
+    font-family: var(--font-body);
+    font-size: 1.4rem; /* Default to 14px */
+    text-rendering: optimizeLegibility;
+
+    /* 4px grid for debugging positioning. Only renders at high zoom levels. */
+    /* background-repeat: repeat;
+    background-size: 4px 4px;
+    background-image: linear-gradient(to left, black 0, transparent 0.1px),
+        linear-gradient(to top, black 0, transparent 0.1px); */
+}
+
+h1 {
+    font-size: 2em;
+}
+h2 {
+    font-size: 1.5em;
+}
+h3 {
+    font-size: 1.25em;
+}
+h1,
+h2,
+h3,
+h4,
+h5 {
+    font-weight: 500;
+}
+
+p,
+blockquote,
+li {
+    font-size: 1em;
+    line-height: 1.5;
+}
+li:not(:last-child) {
+    margin-bottom: 0.5em;
+}
+a {
+    text-decoration: none;
+}
+
+/*=============================================================
+                         COLOR
+=============================================================*/
+:root {
+    --color-base1: #1c1c1c;
+    --color-base2: #333;
+    --color-base3: #444;
+    --color-base-text: #fff;
+    --color-base-text-link: rgb(154, 166, 255);
+    --color-base-text-link-active: rgb(103, 137, 177);
+    --color-accent1: rgb(195, 127, 44);
+    --color-accent1-text: var(--color-base-text);
+
+    color-scheme: dark;
+    background-color: var(--color-base1);
+    color: var(--color-base-text);
+}
+
+a {
+    color: var(--color-base-text-link);
+}
+a:hover {
+    color: var(--color-base-text-link-active);
+}
+
+/*=============================================================
+                         SCROLL
+=============================================================*/
+::-webkit-scrollbar {
+    width: 16px;
+    height: 16px;
+}
+/* ::-webkit-scrollbar-track {
+    background-color: rgba(0, 0, 0, 0.05);
+} */
+::-webkit-scrollbar-thumb {
+    border: 5px solid transparent;
+    box-shadow: inset 0 0 0 1px #888;
+}
+::-webkit-scrollbar-thumb:hover {
+    border: 4px solid transparent;
+    box-shadow: inset 0 0 0 16px #999;
+}
+::-webkit-scrollbar-button:single-button:vertical:decrement {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='rgb(112, 112, 112)'><polygon points='4,16 12,16 8,8'/></svg>");
+}
+::-webkit-scrollbar-button:single-button:vertical:increment {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='rgb(112, 112, 112)'><polygon points='4,0 12,0 8,8'/></svg>");
+}
+/* ::-webkit-scrollbar-button:single-button:horizontal:decrement {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='rgb(112, 112, 112)'><polygon points='16,4 16,12 8,8'/></svg>");
+}
+::-webkit-scrollbar-button:single-button:horizontal:increment {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='rgb(112, 112, 112)'><polygon points='0,4 0,12 8,8'/></svg>");
+} */
+::-webkit-scrollbar-corner {
+    background-color: transparent;
+}
+
+/*=============================================================
+                         LAYOUT
+=============================================================*/
+:root {
+    --site-mainWidth: 700px;
+    --widepadding: 1.6rem;
+}
+.siteRoot {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    grid-template-columns: 100%;
+    grid-auto-columns: 1000px;
+    grid-auto-rows: 1000px;
+    grid-template-areas:
+        "header"
+        "main"
+        "footer";
+}
+.siteRoot > header {
+    grid-area: header;
+}
+.siteRoot > main {
+    grid-area: main;
+}
+.siteRoot > footer {
+    grid-area: footer;
+}
+
+.sitegrid {
+    display: grid;
+    grid-template-columns:
+        [full-width-start] 1fr
+        [wide-start] var(--widepadding)
+        [content-start] clamp(200px, 100% - 2 * var(--widepadding), var(--site-mainWidth)) [content-end]
+        var(--widepadding) [wide-end]
+        1fr [full-width-end];
+}
+.sitegrid > * {
+    grid-column: content;
+}
+.sitegrid > pre {
+    grid-column: wide;
+    padding-left: var(--widepadding);
+    padding-right: var(--widepadding);
+}
+.sitegrid .wide {
+    grid-column: wide;
+}
+.sitegrid .fullwidth {
+    grid-column: full-width;
+}
+
+/*=============================================================
+                         HEADER
+=============================================================*/
+.siteRoot > header {
+    border-bottom: 1px solid var(--color-base3);
+}
+.siteNav {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: stretch;
+    flex-wrap: wrap;
+
+    font-family: "Urbanist", "Century Gothic", sans-serif;
+    line-height: 1;
+    text-decoration: none;
+}
+
+.siteNav .siteLink {
+    color: #666666;
+}
+.siteNav .siteLink:hover {
+    color: #aaaaaa;
+}
+.siteNav h1 {
+    font-weight: 60;
+    font-size: 2.5em;
+    line-height: 1.75;
+    letter-spacing: 0.1em;
+}
+.siteNav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: stretch;
+    text-transform: uppercase;
+}
+.siteNav li {
+    position: relative;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    font-weight: 30;
+    font-size: 1.4em;
+    line-height: 1;
+}
+.siteNav li:not(:last-child)::after {
+    content: "";
+    position: relative;
+    align-self: center;
+    height: 50%;
+    border-right: 1px solid #666666;
+}
+.siteNav li a {
+    text-decoration: none;
+    color: inherit;
+    padding: 0 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.siteNav li a:hover {
+    background-color: var(--color-base3);
+}
+.siteNav li img,
+.siteNav li svg {
+    width: 1.4em;
+    height: 1.4em;
+}
+
+/*=============================================================
+                         MAIN
+=============================================================*/
+.siteRoot > main {
+    padding: 2rem 0;
+}
+
+/*
+    Rhythm
+*/
+.ccontent > * {
+    margin-top: 0.8em;
+}
+.ccontent h2 {
+    grid-column: wide;
+    margin-top: 3.2rem;
+    padding: 0.5em var(--widepadding);
+}
+.ccontent h1[itemprop~="headline"] {
+    margin-top: 0;
+}
+article {
+    margin-bottom: 1em;
+}
+
+/*
+    Customize lists
+*/
+.post ul {
+    --li-marker-square-empty: "□  ";
+    --li-marker-dash: "–  ";
+
+    list-style-position: outside;
+    list-style-type: var(--li-marker-dash);
+    padding-left: calc(16px + 2em);
+}
+.post ul ul {
+    list-style: inside circle;
+    padding-left: 1em;
+}
+.post ol {
+    list-style: inside decimal;
+    margin-left: 2em;
+}
+
+/*
+    Customize tables
+*/
+.post table {
+    width: 100%;
+    font-family: var(--font-mono);
+    font-size: 1.2rem;
+    line-height: normal;
+}
+.post td,
+.post th {
+    padding: 0.2em;
+    border: 1px solid #ccc;
+}
+.post th {
+    background-color: #375a83;
+    color: white;
+}
+.post td:first-child,
+.post th:first-child {
+    border-left: none;
+}
+.post td:last-child,
+.post th:last-child {
+    border-right: none;
+}
+
+/*=============================================================
+                         CODE
+=============================================================*/
+pre,
+code {
+    font-family: var(--font-mono);
+    direction: ltr;
+    text-align: left;
+    white-space: pre;
+    word-spacing: normal;
+    word-break: normal;
+    hyphens: none;
+    overflow: scroll auto;
+    tab-size: 4;
+    font-size: 13px;
+    line-height: 1.5;
+}
+pre {
+    padding-top: 0.5em;
+    padding-bottom: 0.5em;
+
+    box-shadow: inset 0 0 0 1px var(--color-base3);
+    text-shadow: 0 1px #000000; /* make text pop a bit */
+    /* 
+        There seems to be a Chrome bug if border is non-zero.
+        Page scrolling can get stuck if the mouse is over the pre.
+        Seems related to overflow.
+     */
+    border: none;
+}
+/* Inline code */
+:not(pre) > code {
+    font-size: inherit;
+    line-height: inherit;
+    overflow: unset;
+    padding: 0 4px;
+    /* Inline code snippets should wrap to avoid breaking out
+    of the container */
+    white-space: pre-wrap;
+
+    background: #24292e;
+    border: 1px solid var(--color-base3);
+}

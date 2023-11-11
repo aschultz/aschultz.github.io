@@ -1,0 +1,80 @@
+*,
+::before,
+::after {
+    box-sizing: inherit;
+    margin: 0;
+    padding: 0;
+    font-weight: inherit;
+    background-repeat: no-repeat;
+}
+
+html {
+    box-sizing: border-box;
+    cursor: default;
+    tab-size: 4;
+    line-height: 1;
+    scroll-behavior: smooth;
+    overflow-y: scroll;
+    -ms-text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
+
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-font-smoothing: antialiased;
+}
+body {
+    min-height: 100vh;
+}
+
+table {
+    border-collapse: collapse;
+    border-color: inherit;
+    text-indent: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+    font-weight: normal;
+}
+
+b,
+strong,
+th {
+    font-weight: bolder;
+}
+
+ul {
+    list-style: none;
+}
+ul li::before {
+    content: "\200B"; /* Safari fix */
+}
+
+textarea {
+    margin: 0;
+    overflow: auto;
+}
+
+audio,
+video,
+canvas,
+iframe,
+img,
+svg {
+    font-style: italic; /* for alt text */
+    vertical-align: middle;
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
+}
+progress {
+    display: inline-block;
+    vertical-align: baseline;
+}
+
+[aria-disabled="true"],
+[disabled] {
+    cursor: not-allowed;
+}
